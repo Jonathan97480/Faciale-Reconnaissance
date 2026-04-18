@@ -1,4 +1,4 @@
-def _open_capture(camera_index: int):
+
 import os
 import threading
 import time
