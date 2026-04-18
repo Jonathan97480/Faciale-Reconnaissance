@@ -25,6 +25,28 @@ Projet initial avec:
 - `frontend/`: interface de configuration, gestion de visages, monitoring
 - `.github/`: instructions/skills/agents pour les agents IA
 
+## Installation rapide (Windows & Linux)
+
+Pour installer toutes les dépendances backend et frontend automatiquement :
+
+- **Windows** : 
+  
+	Dans un terminal à la racine du projet :
+  
+	```bat
+	install-win.bat
+	```
+
+- **Linux** :
+  
+	Dans un terminal à la racine du projet :
+  
+	```sh
+	bash install-linux.sh
+	```
+
+---
+
 ## Lancer le backend
 
 1. Ouvrir un terminal dans `backend/`
