@@ -33,6 +33,7 @@ export default function ConfigPanel() {
         detection_interval_seconds: Number(draft.detection_interval_seconds),
         match_threshold: Number(draft.match_threshold),
         camera_index: Number(draft.camera_index),
+        camera_source: draft.camera_source ?? "",
         enroll_frames_count: Number(draft.enroll_frames_count),
         face_crop_padding_ratio: Number(draft.face_crop_padding_ratio),
       });
@@ -69,13 +70,23 @@ export default function ConfigPanel() {
           />
         </label>
         <label>
-          Index camera
+          Index caméra locale
           <input
             type="number"
             min="0"
             step="1"
             value={draft.camera_index}
             onChange={(event) => onChange("camera_index", event.target.value)}
+          />
+        </label>
+        <label>
+          Source caméra réseau (URL, RTSP, fichier vidéo)
+          <input
+            type="text"
+            placeholder="Laisser vide pour webcam locale"
+            value={draft.camera_source ?? ""}
+            onChange={(event) => onChange("camera_source", event.target.value)}
+            style={{ width: "100%" }}
           />
         </label>
         <label>

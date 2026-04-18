@@ -1,0 +1,10 @@
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.11.7
+pytest==8.4.1
+httpx==0.28.1
+# Webcam capture
+opencv-python>=4.8.0
+# Face encoding — pre-built wheel, no compilation needed
+facenet-pytorch>=2.5.3
+Pillow>=10.0.0

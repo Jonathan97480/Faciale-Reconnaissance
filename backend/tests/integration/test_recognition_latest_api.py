@@ -1,0 +1,125 @@
+import json
+
+from fastapi.testclient import TestClient
+
+from app.core.database import get_connection
+from app.main import create_app
+
+
+def test_latest_detection_returns_all_detected_faces(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+
+    with TestClient(create_app()) as client:
+        with get_connection() as conn:
+            conn.execute(
+                "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
+                ("Alice", json.dumps([0.1] * 512)),
+            )
+            conn.execute(
+                "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
+                ("Bob", json.dumps([0.2] * 512)),
+            )
+            conn.execute(
+                """
+                INSERT INTO detections (status, face_id, score, faces_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    "reconnu",
+                    1,
+                    0.91,
+                    json.dumps(
+                        [
+                            {
+                                "status": "reconnu",
+                                "face_id": 1,
+                                "face_name": "Alice",
+                                "score": 0.91,
+                            },
+                            {
+                                "status": "inconnu",
+                                "face_id": None,
+                                "face_name": None,
+                                "score": None,
+                            },
+                        ]
+                    ),
+                ),
+            )
+            conn.commit()
+
+        response = client.get("/api/recognition/latest")
+
+    assert response.status_code == 200
+    payload = response.json()["detection"]
+    assert payload["faces_count"] == 2
+    assert payload["faces"][0]["face_name"] == "Alice"
+    assert payload["faces"][1]["status"] == "inconnu"
+
+
+def test_latest_detection_falls_back_to_legacy_columns(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+
+    with TestClient(create_app()) as client:
+        with get_connection() as conn:
+            conn.execute(
+                "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
+                ("Charlie", json.dumps([0.3] * 512)),
+            )
+            conn.execute(
+                """
+                INSERT INTO detections (status, face_id, score, faces_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                ("reconnu", 1, 0.88, None),
+            )
+            conn.commit()
+
+        response = client.get("/api/recognition/latest")
+
+    assert response.status_code == 200
+    payload = response.json()["detection"]
+    assert payload["faces_count"] == 1
+    assert payload["faces"][0]["face_name"] == "Charlie"
+
+
+def test_detection_history_returns_latest_10_entries(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+
+    with TestClient(create_app()) as client:
+        with get_connection() as conn:
+            conn.execute(
+                "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
+                ("Agent", json.dumps([0.4] * 512)),
+            )
+            for index in range(12):
+                conn.execute(
+                    """
+                    INSERT INTO detections (status, face_id, score, faces_json)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        "reconnu",
+                        1,
+                        0.8,
+                        json.dumps(
+                            [
+                                {
+                                    "status": "reconnu",
+                                    "face_id": 1,
+                                    "face_name": f"Agent-{index}",
+                                    "score": 0.8,
+                                }
+                            ]
+                        ),
+                    ),
+                )
+            conn.commit()
+
+        response = client.get("/api/recognition/history")
+
+    assert response.status_code == 200
+    detections = response.json()["detections"]
+    assert len(detections) == 10
+    assert detections[0]["faces"][0]["face_name"] == "Agent-11"
+    assert detections[-1]["faces"][0]["face_name"] == "Agent-2"

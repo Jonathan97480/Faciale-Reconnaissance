@@ -29,21 +29,21 @@ Projet initial avec:
 
 Pour installer toutes les dépendances backend et frontend automatiquement :
 
-- **Windows** : 
-  
-	Dans un terminal à la racine du projet :
-  
-	```bat
-	install-win.bat
-	```
+- **Windows** :
+
+  Dans un terminal à la racine du projet :
+
+  ```bat
+  install-win.bat
+  ```
 
 - **Linux** :
-  
-	Dans un terminal à la racine du projet :
-  
-	```sh
-	bash install-linux.sh
-	```
+
+  Dans un terminal à la racine du projet :
+
+  ```sh
+  bash install-linux.sh
+  ```
 
 ---
 
