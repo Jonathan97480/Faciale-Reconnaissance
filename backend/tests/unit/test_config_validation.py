@@ -30,3 +30,13 @@ def test_rejects_invalid_face_crop_padding_ratio():
             camera_index=0,
             face_crop_padding_ratio=1.2,
         )
+
+
+def test_rejects_more_than_ten_network_camera_sources():
+    with pytest.raises(ValidationError):
+        ConfigPayload(
+            detection_interval_seconds=3,
+            match_threshold=0.7,
+            camera_index=0,
+            network_camera_sources=[f"rtsp://cam-{idx}" for idx in range(11)],
+        )

@@ -6,6 +6,7 @@ export default function ConfigPanel() {
   const { config, loading, error, saveConfig } = useConfig();
   const [local, setLocal] = useState(null);
   const [status, setStatus] = useState("");
+  const [newNetworkSource, setNewNetworkSource] = useState("");
 
   if (loading) {
     return <section className="panel"><h2>Configuration</h2><p>Chargement...</p></section>;
@@ -29,11 +30,18 @@ export default function ConfigPanel() {
   const onSave = async () => {
     setStatus("Sauvegarde...");
     try {
+      const sanitizedNetworkSources = (draft.network_camera_sources ?? [])
+        .map((source) => String(source).trim())
+        .filter((source, index, arr) => source && arr.indexOf(source) === index)
+        .slice(0, 10);
+
       await saveConfig({
         detection_interval_seconds: Number(draft.detection_interval_seconds),
         match_threshold: Number(draft.match_threshold),
         camera_index: Number(draft.camera_index),
         camera_source: draft.camera_source ?? "",
+        network_camera_sources: sanitizedNetworkSources,
+        multi_camera_cycle_budget_seconds: Number(draft.multi_camera_cycle_budget_seconds),
         enroll_frames_count: Number(draft.enroll_frames_count),
         face_crop_padding_ratio: Number(draft.face_crop_padding_ratio),
       });
@@ -42,6 +50,34 @@ export default function ConfigPanel() {
     } catch {
       setStatus("Echec de sauvegarde.");
     }
+  };
+
+  const addNetworkSource = () => {
+    const cleaned = newNetworkSource.trim();
+    if (!cleaned) {
+      return;
+    }
+    const current = draft.network_camera_sources ?? [];
+    if (current.includes(cleaned)) {
+      setStatus("Ce flux est deja ajoute.");
+      return;
+    }
+    if (current.length >= 10) {
+      setStatus("Maximum 10 flux reseau.");
+      return;
+    }
+    onChange("network_camera_sources", [...current, cleaned]);
+    setNewNetworkSource("");
+    setStatus("");
+  };
+
+  const removeNetworkSource = (sourceToRemove) => {
+    const current = draft.network_camera_sources ?? [];
+    onChange(
+      "network_camera_sources",
+      current.filter((source) => source !== sourceToRemove)
+    );
+    setStatus("");
   };
 
   return (
@@ -90,6 +126,17 @@ export default function ConfigPanel() {
           />
         </label>
         <label>
+          Budget cycle multi-cameras (secondes)
+          <input
+            type="number"
+            min="0.1"
+            max="10"
+            step="0.1"
+            value={draft.multi_camera_cycle_budget_seconds ?? 2}
+            onChange={(event) => onChange("multi_camera_cycle_budget_seconds", event.target.value)}
+          />
+        </label>
+        <label>
           Nombre de frames d'enrolement
           <input
             type="number"
@@ -111,6 +158,32 @@ export default function ConfigPanel() {
             onChange={(event) => onChange("face_crop_padding_ratio", event.target.value)}
           />
         </label>
+      </div>
+      <div className="panel" style={{ marginTop: 10 }}>
+        <h3>Flux caméras réseau (max 10)</h3>
+        <div className="button-row">
+          <input
+            type="text"
+            placeholder="rtsp://..., http://..., fichier video..."
+            value={newNetworkSource}
+            onChange={(event) => setNewNetworkSource(event.target.value)}
+            style={{ width: "100%" }}
+          />
+          <button type="button" onClick={addNetworkSource}>Ajouter flux</button>
+        </div>
+        {(draft.network_camera_sources ?? []).length === 0 && (
+          <p className="status-line">Aucun flux reseau configure.</p>
+        )}
+        {(draft.network_camera_sources ?? []).length > 0 && (
+          <ul className="history-list">
+            {(draft.network_camera_sources ?? []).map((source) => (
+              <li key={source} className="history-row">
+                <span>{source}</span>
+                <button type="button" onClick={() => removeNetworkSource(source)}>Supprimer</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div className="button-row" style={{ marginTop: 10 }}>
         <button type="button" onClick={() => shiftCamera(-1)}>Camera precedente</button>

@@ -9,6 +9,7 @@ from app.api.routes import config, enrollment, faces, production_recognition, re
 from app.core.database import init_db
 from app.services.camera_service import stop_camera_runtime
 from app.services.detection_loop import detection_loop
+from app.services.network_camera_pool_service import stop_network_camera_pool
 
 
 @asynccontextmanager
@@ -20,6 +21,7 @@ async def lifespan(_: FastAPI):
     finally:
         detection_loop.stop()
         stop_camera_runtime()
+        stop_network_camera_pool()
 
 
 def create_app() -> FastAPI:

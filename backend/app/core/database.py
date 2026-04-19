@@ -7,6 +7,8 @@ DEFAULT_CONFIG = {
     "match_threshold": "0.6",
     "camera_index": "0",
     "camera_source": "",  # vide = webcam locale, sinon URL ou chemin
+    "network_camera_sources_json": "[]",
+    "multi_camera_cycle_budget_seconds": "2",
     "enroll_frames_count": "5",
     "face_crop_padding_ratio": "0.2",
 }

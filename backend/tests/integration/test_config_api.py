@@ -11,11 +11,19 @@ def test_get_and_update_config(monkeypatch, tmp_path):
         initial = client.get("/api/config")
         assert initial.status_code == 200
         assert initial.json()["detection_interval_seconds"] == 3
+        assert initial.json()["network_camera_sources"] == []
+        assert initial.json()["multi_camera_cycle_budget_seconds"] == 2
 
         payload = {
             "detection_interval_seconds": 5,
             "match_threshold": 0.72,
             "camera_index": 1,
+            "camera_source": "",
+            "network_camera_sources": [
+                "rtsp://camera-1",
+                "rtsp://camera-2",
+            ],
+            "multi_camera_cycle_budget_seconds": 2,
             "enroll_frames_count": 8,
             "face_crop_padding_ratio": 0.25,
         }

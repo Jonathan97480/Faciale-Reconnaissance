@@ -19,6 +19,7 @@ from app.services.camera_service import (
 )
 from app.services.detection_loop import detection_loop
 from app.services.image_recognition_service import analyze_image_bytes
+from app.services.network_camera_pool_service import network_camera_pool_status
 from app.services.recognition_service import (
     get_detection_history,
     get_latest_detection,
@@ -49,6 +50,7 @@ def get_loop_status() -> dict[str, object]:
     return {
         "loop": detection_loop.status(),
         "capture_settings": current_capture_settings(),
+        "network_cameras": network_camera_pool_status(),
     }
 
 

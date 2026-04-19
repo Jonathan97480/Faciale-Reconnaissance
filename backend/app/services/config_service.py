@@ -1,3 +1,5 @@
+import json
+
 from app.core.database import get_connection
 from app.core.schemas import ConfigPayload
 
@@ -7,11 +9,24 @@ def read_config() -> ConfigPayload:
         rows = connection.execute("SELECT key, value FROM config").fetchall()
 
     raw_config = {row["key"]: row["value"] for row in rows}
+    raw_sources = raw_config.get("network_camera_sources_json", "[]")
+    network_sources: list[str] = []
+    try:
+        parsed_sources = json.loads(raw_sources)
+        if isinstance(parsed_sources, list):
+            network_sources = [str(item).strip() for item in parsed_sources if str(item).strip()]
+    except json.JSONDecodeError:
+        network_sources = []
+
     return ConfigPayload(
         detection_interval_seconds=float(raw_config["detection_interval_seconds"]),
         match_threshold=float(raw_config["match_threshold"]),
         camera_index=int(raw_config["camera_index"]),
         camera_source=raw_config.get("camera_source", ""),
+        network_camera_sources=network_sources,
+        multi_camera_cycle_budget_seconds=float(
+            raw_config.get("multi_camera_cycle_budget_seconds", "2")
+        ),
         enroll_frames_count=int(raw_config.get("enroll_frames_count", "5")),
         face_crop_padding_ratio=float(raw_config.get("face_crop_padding_ratio", "0.2")),
     )
@@ -23,6 +38,8 @@ def update_config(payload: ConfigPayload) -> ConfigPayload:
         "match_threshold": str(payload.match_threshold),
         "camera_index": str(payload.camera_index),
         "camera_source": str(payload.camera_source),
+        "network_camera_sources_json": json.dumps(payload.network_camera_sources),
+        "multi_camera_cycle_budget_seconds": str(payload.multi_camera_cycle_budget_seconds),
         "enroll_frames_count": str(payload.enroll_frames_count),
         "face_crop_padding_ratio": str(payload.face_crop_padding_ratio),
     }
