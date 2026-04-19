@@ -9,10 +9,14 @@ venv/
 
 # Backend runtime data
 backend/data/
+backend/dev_tools/*.log
 
 # Node
 frontend/node_modules/
 frontend/dist/
+
+# Local test media
+testFlux/
 
 # Env files
 .env

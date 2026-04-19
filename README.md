@@ -138,3 +138,70 @@ Voir [API.md](API.md) pour:
 - les payloads
 - des exemples de requetes
 - les codes de retour
+
+## Outil de test dev (acteurs + flux film)
+
+Script:
+
+- `backend/dev_tools/actor_movie_test_tool.py`
+
+Objectif:
+
+- importer des acteurs depuis une API publique gratuite (TVMaze)
+- streamer un film local en flux MJPEG reseau
+- brancher ce flux dans la configuration de l'application
+
+Exemples depuis `backend/`:
+
+1. Importer des acteurs d'une serie:
+```bash
+python dev_tools/actor_movie_test_tool.py import-actors --show "Breaking Bad" --limit 10 --skip-existing
+```
+
+2. Diffuser un film local en flux reseau:
+```bash
+python dev_tools/actor_movie_test_tool.py stream-movie --video "C:\\videos\\film.mp4" --port 8090
+```
+
+3. Configurer l'application pour lire ce flux (mode camera reseau):
+```bash
+python dev_tools/actor_movie_test_tool.py configure-stream --url "http://127.0.0.1:8090/stream.mjpg" --mode network
+```
+
+4. Alternative: utiliser le flux en camera_source principale:
+```bash
+python dev_tools/actor_movie_test_tool.py configure-stream --url "http://127.0.0.1:8090/stream.mjpg" --mode local
+```
+
+### Scenario complet de test live (film + acteurs)
+
+Depuis la racine du projet:
+
+1. Lancer backend + frontend:
+```bat
+start-dev.bat
+```
+
+2. Dans un autre terminal, lancer le flux MJPEG en boucle a partir d'un extrait:
+```bash
+cd backend
+python dev_tools/actor_movie_test_tool.py stream-movie --video "..\\testFlux\\AVENGERS 2.mp4" --host 127.0.0.1 --port 8090 --path /stream.mjpg --fps 10
+```
+
+3. Importer les acteurs a partir d'une API publique:
+```bash
+cd backend
+python dev_tools/actor_movie_test_tool.py import-actors --show "Avengers" --limit 10 --skip-existing
+```
+
+4. Configurer le flux reseau dans l'application:
+```bash
+cd backend
+python dev_tools/actor_movie_test_tool.py configure-stream --url "http://127.0.0.1:8090/stream.mjpg" --mode network
+```
+
+5. Ouvrir Monitoring:
+
+- la grille des flux doit afficher le flux reseau en `actif`
+- un clic sur une tuile de flux la passe en flux principal
+- les boxes + noms s'affichent sur flux principal et flux reseau

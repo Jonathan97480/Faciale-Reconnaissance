@@ -19,7 +19,14 @@ from app.services.camera_service import (
 )
 from app.services.detection_loop import detection_loop
 from app.services.image_recognition_service import analyze_image_bytes
-from app.services.network_camera_pool_service import network_camera_pool_status
+from app.services.network_camera_pool_service import (
+    has_network_camera_source,
+    network_camera_pool_status,
+)
+from app.services.network_preview_service import (
+    get_network_preview_jpeg,
+    stream_network_preview_frames,
+)
 from app.services.recognition_service import (
     get_detection_history,
     get_latest_detection,
@@ -158,5 +165,25 @@ def get_preview() -> Response:
 def get_preview_stream() -> StreamingResponse:
     return StreamingResponse(
         stream_preview_frames(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@router.get("/network-preview")
+def get_network_preview(source: str = Query(min_length=1)) -> Response:
+    if not has_network_camera_source(source):
+        raise HTTPException(status_code=404, detail="Flux reseau non configure")
+    preview = get_network_preview_jpeg(source)
+    if preview is None:
+        return Response(status_code=503)
+    return Response(content=preview, media_type="image/jpeg")
+
+
+@router.get("/network-preview/stream")
+def get_network_preview_stream(source: str = Query(min_length=1)) -> StreamingResponse:
+    if not has_network_camera_source(source):
+        raise HTTPException(status_code=404, detail="Flux reseau non configure")
+    return StreamingResponse(
+        stream_network_preview_frames(source),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )

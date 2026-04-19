@@ -111,6 +111,17 @@ class NetworkCameraPool:
                 frames.append((source, frame))
         return frames
 
+    def get_frame_for_source(self, source: str):
+        with self._lock:
+            worker = self._workers.get(source)
+        if worker is None:
+            return None
+        return worker.get_latest_frame()
+
+    def has_source(self, source: str) -> bool:
+        with self._lock:
+            return source in self._workers
+
     def stop(self) -> None:
         with self._lock:
             workers = list(self._workers.values())
@@ -144,3 +155,11 @@ def stop_network_camera_pool() -> None:
 
 def network_camera_pool_status() -> dict[str, object]:
     return network_camera_pool.status()
+
+
+def get_network_camera_frame(source: str):
+    return network_camera_pool.get_frame_for_source(source)
+
+
+def has_network_camera_source(source: str) -> bool:
+    return network_camera_pool.has_source(source)

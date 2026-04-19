@@ -9,8 +9,11 @@ export default function MonitoringPanel() {
   const [latestDetection, setLatestDetection] = useState(null);
   const [history, setHistory] = useState([]);
   const [loopState, setLoopState] = useState(null);
+  const [runtimeConfig, setRuntimeConfig] = useState(null);
   const [status, setStatus] = useState("");
-  const [cameraStatus, setCameraStatus] = useState("Apercu camera backend actif.");
+  const [cameraStatus, setCameraStatus] = useState("Apercu flux actif.");
+  const [feedStatus, setFeedStatus] = useState({});
+  const [mainFeedKey, setMainFeedKey] = useState("local");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const streamWrapRef = useRef(null);
 
@@ -41,13 +44,24 @@ export default function MonitoringPanel() {
     }
   };
 
+  const refreshConfig = async () => {
+    try {
+      const response = await apiClient.getConfig();
+      setRuntimeConfig(response);
+    } catch {
+      setStatus("Echec de lecture de la configuration runtime.");
+    }
+  };
+
   useEffect(() => {
     refreshLoopState();
+    refreshConfig();
     refreshLatestDetection();
     refreshHistory();
 
     const timer = setInterval(() => {
       refreshLoopState();
+      refreshConfig();
       refreshLatestDetection();
       refreshHistory();
     }, 3000);
@@ -108,6 +122,29 @@ export default function MonitoringPanel() {
 
   const detectedFaces = latestDetection?.faces ?? [];
   const hasUnknownFace = detectedFaces.some((face) => face.status === "inconnu");
+  const networkSources = runtimeConfig?.network_camera_sources ?? [];
+  const allFeeds = [
+    { key: "local", label: "Camera locale", type: "local", source: "" },
+    ...networkSources.map((source, index) => ({
+      key: `network:${source}`,
+      label: `Flux reseau #${index + 1}`,
+      type: "network",
+      source,
+    })),
+  ];
+  const currentMainFeed = allFeeds.find((feed) => feed.key === mainFeedKey) || allFeeds[0];
+  const sideFeeds = allFeeds.filter((feed) => feed.key !== currentMainFeed.key);
+
+  useEffect(() => {
+    if (!allFeeds.some((feed) => feed.key === mainFeedKey)) {
+      setMainFeedKey("local");
+    }
+  }, [mainFeedKey, allFeeds]);
+
+  const mainFeedUrl =
+    currentMainFeed.type === "local"
+      ? apiClient.getRecognitionPreviewStreamUrl()
+      : apiClient.getNetworkPreviewStreamUrl(currentMainFeed.source);
 
   return (
     <section className="panel">
@@ -119,14 +156,20 @@ export default function MonitoringPanel() {
       <h2>Monitoring</h2>
       <div className={`stream-wrap ${isFullscreen ? "fullscreen" : ""}`} ref={streamWrapRef}>
         <img
-          src={apiClient.getRecognitionPreviewStreamUrl()}
-          alt="Apercu camera backend"
-          onError={() => setCameraStatus("Aucune image camera (verifiez index camera et disponibilite).")}
-          onLoad={() => setCameraStatus("Apercu camera backend actif.")}
+          src={mainFeedUrl}
+          alt={`Apercu ${currentMainFeed.label}`}
+          onError={() => {
+            setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: false }));
+            setCameraStatus(`Flux principal indisponible (${currentMainFeed.label}).`);
+          }}
+          onLoad={() => {
+            setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: true }));
+            setCameraStatus(`Flux principal actif (${currentMainFeed.label}).`);
+          }}
         />
         <div className="hud-overlay">
           <div className="hud-corners" />
-          <div className="hud-topline">TACTICAL IDENT / LIVE FEED</div>
+          <div className="hud-topline">TACTICAL IDENT / {currentMainFeed.label.toUpperCase()}</div>
           <div className="hud-meta">
             <span>FACES: {detectedFaces.length}</span>
             <span>LOOP: {loopState?.loop?.running ? "RUNNING" : "STOPPED"}</span>
@@ -135,12 +178,64 @@ export default function MonitoringPanel() {
         </div>
       </div>
       <p className={`status-line ${cameraStatus.includes("actif") ? "ok" : "warn"}`}>{cameraStatus}</p>
+      <section className="history-panel">
+        <h3>Grille des flux configures</h3>
+        {sideFeeds.length === 0 && (
+          <p className="status-line">Aucun flux secondaire disponible.</p>
+        )}
+        {sideFeeds.length > 0 && (
+          <div className="stream-grid">
+            {sideFeeds.map((feed) => {
+              const streamIsOk = feedStatus[feed.key] !== false;
+              const feedUrl =
+                feed.type === "local"
+                  ? apiClient.getRecognitionPreviewStreamUrl()
+                  : apiClient.getNetworkPreviewStreamUrl(feed.source);
+              return (
+                <article
+                  key={feed.key}
+                  className="stream-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setMainFeedKey(feed.key)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      setMainFeedKey(feed.key);
+                    }
+                  }}
+                >
+                  <div className="stream-card-head">
+                    <strong>{feed.label}</strong>
+                    <span className={`badge ${streamIsOk ? "ok" : "warn"}`}>
+                      {streamIsOk ? "actif" : "indisponible"}
+                    </span>
+                  </div>
+                  <p className="stream-source">{feed.type === "local" ? "camera locale" : feed.source}</p>
+                  <div className="stream-mini-wrap">
+                    <img
+                      src={feedUrl}
+                      alt={`Apercu ${feed.label}`}
+                      onLoad={() =>
+                        setFeedStatus((prev) => ({ ...prev, [feed.key]: true }))
+                      }
+                      onError={() =>
+                        setFeedStatus((prev) => ({ ...prev, [feed.key]: false }))
+                      }
+                    />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
       <div className="button-row">
         <button onClick={runCheck}>Lancer verification manuelle</button>
         <button onClick={toggleFullscreen}>{isFullscreen ? "Quitter plein ecran" : "Plein ecran HUD"}</button>
         <button
           onClick={async () => {
             await refreshLoopState();
+            await refreshConfig();
             await refreshLatestDetection();
             await refreshHistory();
           }}

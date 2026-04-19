@@ -65,6 +65,8 @@ export const apiClient = {
         });
     },
     getRecognitionPreviewStreamUrl: () => `${apiBaseUrl}/recognition/preview/stream`,
+    getNetworkPreviewStreamUrl: (source) =>
+        `${apiBaseUrl}/recognition/network-preview/stream?source=${encodeURIComponent(source)}`,
     getRecognitionPreviewUrl: (cacheBuster = "") =>
         `${apiBaseUrl}/recognition/preview${cacheBuster ? `?t=${cacheBuster}` : ""}`,
 };
