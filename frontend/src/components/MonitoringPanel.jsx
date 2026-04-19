@@ -8,6 +8,7 @@ export default function MonitoringPanel() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [latestDetection, setLatestDetection] = useState(null);
   const [history, setHistory] = useState([]);
+  const [cameraAlerts, setCameraAlerts] = useState([]);
   const [loopState, setLoopState] = useState(null);
   const [runtimeConfig, setRuntimeConfig] = useState(null);
   const [status, setStatus] = useState("");
@@ -45,6 +46,15 @@ export default function MonitoringPanel() {
     }
   };
 
+  const refreshCameraAlerts = async () => {
+    try {
+      const response = await apiClient.getCameraAlerts();
+      setCameraAlerts(response.alerts ?? []);
+    } catch {
+      setStatus("Echec de lecture des alertes camera.");
+    }
+  };
+
   const refreshConfig = async () => {
     try {
       const response = await apiClient.getConfig();
@@ -59,12 +69,14 @@ export default function MonitoringPanel() {
     refreshConfig();
     refreshLatestDetection();
     refreshHistory();
+    refreshCameraAlerts();
 
     const timer = setInterval(() => {
       refreshLoopState();
       refreshConfig();
       refreshLatestDetection();
       refreshHistory();
+      refreshCameraAlerts();
     }, 3000);
 
     return () => clearInterval(timer);
@@ -213,6 +225,23 @@ export default function MonitoringPanel() {
       </div>
       <p className={`status-line ${cameraStatus.includes("actif") ? "ok" : "warn"}`}>{cameraStatus}</p>
       <section className="history-panel">
+        <h3>Alertes camera</h3>
+        {cameraAlerts.length === 0 && (
+          <p className="status-line ok">Aucune alerte camera.</p>
+        )}
+        {cameraAlerts.length > 0 && (
+          <ul className="history-list">
+            {cameraAlerts.slice(0, 10).map((alert, index) => (
+              <li key={`${alert.source}-${alert.type}-${index}`} className="history-row">
+                <span>{alert.level}</span>
+                <span>{alert.type}</span>
+                <span>{alert.source}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <section className="history-panel">
         <h3>Grille des flux configures</h3>
         {sideFeeds.length === 0 && (
           <p className="status-line">Aucun flux secondaire disponible.</p>
@@ -284,6 +313,7 @@ export default function MonitoringPanel() {
             await refreshConfig();
             await refreshLatestDetection();
             await refreshHistory();
+            await refreshCameraAlerts();
           }}
         >
           Rafraichir etat loop

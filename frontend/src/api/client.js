@@ -36,6 +36,10 @@ export const apiClient = {
     checkRecognition: (payload) =>
         request("/recognition/check", { method: "POST", body: JSON.stringify(payload) }),
     getLoopStatus: () => request("/recognition/loop/status"),
+    getCameraAlerts: () => request("/cameras/alerts"),
+    discoverOnvif: (timeoutSeconds = 2) =>
+        request(`/cameras/onvif/discover?timeout_seconds=${timeoutSeconds}`),
+    getResolvedCameraProfiles: () => request("/cameras/profiles/resolved"),
     getLatestDetection: () => request("/recognition/latest"),
     getDetectionHistory: (limit = 10) => request(`/recognition/history?limit=${limit}`),
     analyzeImageFile: async (file) => {

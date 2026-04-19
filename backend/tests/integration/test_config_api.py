@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.core.database import get_connection
 from app.main import create_app
 
 
@@ -56,3 +57,12 @@ def test_get_and_update_config(monkeypatch, tmp_path):
         round_trip = client.get("/api/config")
         assert round_trip.status_code == 200
         assert round_trip.json() == expected
+
+        with get_connection() as connection:
+            row = connection.execute(
+                "SELECT value FROM config WHERE key = 'network_camera_profiles_json'"
+            ).fetchone()
+        assert row is not None
+        raw_value = str(row["value"])
+        assert "secret" not in raw_value
+        assert "enc:v1:" in raw_value

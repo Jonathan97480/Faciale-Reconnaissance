@@ -9,6 +9,7 @@ from app.api.routes import cameras, config, enrollment, faces, production_recogn
 from app.core.database import init_db
 from app.services.camera_service import stop_camera_runtime
 from app.services.detection_loop import detection_loop
+from app.services.hls_gateway_service import stop_all_hls_sessions
 from app.services.network_camera_pool_service import stop_network_camera_pool
 
 
@@ -22,6 +23,7 @@ async def lifespan(_: FastAPI):
         detection_loop.stop()
         stop_camera_runtime()
         stop_network_camera_pool()
+        stop_all_hls_sessions()
 
 
 def create_app() -> FastAPI:

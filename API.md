@@ -25,6 +25,7 @@ Exemple de reponse:
   "camera_index": 0,
   "camera_source": "",
   "network_camera_sources": [],
+  "network_camera_profiles": [],
   "multi_camera_cycle_budget_seconds": 2.0,
   "enroll_frames_count": 5,
   "face_crop_padding_ratio": 0.2
@@ -42,9 +43,23 @@ Champs:
 - `camera_index` (`int >= 0`)
 - `camera_source` (`string`, vide = webcam locale)
 - `network_camera_sources` (`string[]`, max 10)
+- `network_camera_profiles` (`NetworkCameraProfile[]`, max 10)
 - `multi_camera_cycle_budget_seconds` (`float`, `0.1..10`)
 - `enroll_frames_count` (`int`, `1..30`)
 - `face_crop_padding_ratio` (`float`, `0..1`)
+
+`NetworkCameraProfile`:
+
+- `name` (`string`)
+- `protocol` (`rtsp|mjpeg|http|hls`)
+- `host` (`string`)
+- `port` (`int`)
+- `path` (`string`)
+- `username` (`string`)
+- `password` (`string`) (masque en lecture)
+- `has_password` (`bool`) (info uniquement)
+- `onvif_url` (`string`, optionnel)
+- `enabled` (`bool`)
 
 Exemple:
 
@@ -57,6 +72,19 @@ Exemple:
   "network_camera_sources": [
     "rtsp://cam1/stream",
     "rtsp://cam2/stream"
+  ],
+  "network_camera_profiles": [
+    {
+      "name": "Entrance Cam",
+      "protocol": "rtsp",
+      "host": "192.168.1.20",
+      "port": 554,
+      "path": "/stream1",
+      "username": "admin",
+      "password": "admin",
+      "onvif_url": "",
+      "enabled": true
+    }
   ],
   "multi_camera_cycle_budget_seconds": 2.0,
   "enroll_frames_count": 5,
@@ -177,7 +205,76 @@ Header requis:
 
 - `x-api-key: <FACE_API_KEY>`
 
-## 5) Admin logs
+## 5) Camera Operations
+
+### GET `/api/cameras/onvif/discover?timeout_seconds=2`
+
+Discovery ONVIF (WS-Discovery multicast).
+
+Reponse:
+
+```json
+{
+  "count": 1,
+  "devices": [
+    {
+      "ip": "192.168.1.20",
+      "port": 3702,
+      "xaddrs": ["http://192.168.1.20/onvif/device_service"],
+      "scopes": "onvif://..."
+    }
+  ]
+}
+```
+
+### GET `/api/cameras/events?limit=50`
+
+Journal des evenements flux camera (start/connect/error/stop).
+
+### GET `/api/cameras/profiles/resolved`
+
+Retourne les profils avec URL stream resolue (sans credentials) et URL de lecture web si disponible.
+
+### GET `/api/cameras/alerts`
+
+Alertes operationnelles derivees du runtime:
+
+- `camera_down`
+- `high_read_latency`
+- `detection_stale`
+
+### POST `/api/cameras/playback/start?profile_name=...`
+
+Demarre/retourne une URL de lecture web:
+
+- mode `direct` pour profils `hls/http/mjpeg`
+- mode `hls_proxy` pour `rtsp` (FFmpeg requis)
+
+Exemple reponse proxy:
+
+```json
+{
+  "mode": "hls_proxy",
+  "profile_name": "Entrance Cam",
+  "session_id": "abc123",
+  "playback_url": "/api/cameras/hls/abc123/index.m3u8",
+  "audio_expected": true
+}
+```
+
+### GET `/api/cameras/playback/sessions`
+
+Liste des sessions HLS actives.
+
+### DELETE `/api/cameras/playback/sessions/{session_id}`
+
+Arrete une session HLS.
+
+### GET `/api/cameras/hls/{session_id}/{filename}`
+
+Recupere les assets HLS (`.m3u8`, `.ts`) de la session.
+
+## 6) Admin logs
 
 ### GET `/api/admin/batch-logs/`
 
@@ -195,7 +292,7 @@ Header requis:
 
 - `x-admin-api-key: <FACE_ADMIN_API_KEY>`
 
-## 6) Auth admin
+## 7) Auth admin
 
 ### POST `/api/auth/login`
 

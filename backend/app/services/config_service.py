@@ -2,6 +2,7 @@ import json
 
 from app.core.database import get_connection
 from app.core.schemas import ConfigPayload, NetworkCameraProfile
+from app.services.secret_crypto_service import decrypt_secret, encrypt_secret
 
 
 def _profile_identity_key(profile: NetworkCameraProfile) -> str:
@@ -44,7 +45,10 @@ def read_config(mask_secrets: bool = False) -> ConfigPayload:
         if isinstance(parsed_profiles, list):
             for item in parsed_profiles:
                 if isinstance(item, dict):
-                    network_profiles.append(NetworkCameraProfile(**item))
+                    profile = NetworkCameraProfile(**item)
+                    profile.password = decrypt_secret(profile.password)
+                    profile.has_password = bool(profile.password)
+                    network_profiles.append(profile)
     except (json.JSONDecodeError, TypeError, ValueError):
         network_profiles = []
     if mask_secrets:
@@ -99,7 +103,14 @@ def update_config(payload: ConfigPayload) -> ConfigPayload:
         "camera_source": str(payload.camera_source),
         "network_camera_sources_json": json.dumps(payload.network_camera_sources),
         "network_camera_profiles_json": json.dumps(
-            [profile.model_dump() for profile in merged_profiles]
+            [
+                {
+                    **profile.model_dump(),
+                    "password": encrypt_secret(profile.password),
+                    "has_password": bool(profile.password),
+                }
+                for profile in merged_profiles
+            ]
         ),
         "multi_camera_cycle_budget_seconds": str(payload.multi_camera_cycle_budget_seconds),
         "enroll_frames_count": str(payload.enroll_frames_count),
