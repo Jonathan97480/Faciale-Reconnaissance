@@ -13,5 +13,8 @@ def get_config() -> ConfigPayload:
 
 @router.put("", response_model=ConfigPayload)
 def put_config(payload: ConfigPayload) -> ConfigPayload:
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logging.info(f"[API] PUT /api/config reçu, payload: {payload}")
     update_config(payload)
     return read_config(mask_secrets=True)
