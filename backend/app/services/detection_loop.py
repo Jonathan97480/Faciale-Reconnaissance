@@ -1,4 +1,5 @@
 import threading
+import traceback
 
 from app.services.camera_service import capture_frame
 from app.services.config_service import read_config
@@ -29,13 +30,19 @@ class DetectionLoop:
 
     def _run(self) -> None:
         while not self._stop_event.is_set():
-            frame = capture_frame()
-            embeddings = extract_embeddings(frame)
-            results = recognize_faces(embeddings)
-            save_detection(results)
+            try:
+                frame = capture_frame()
+                embeddings = extract_embeddings(frame)
+                results = recognize_faces(embeddings)
+                save_detection(results)
 
-            config = read_config()
-            self._stop_event.wait(config.detection_interval_seconds)
+                config = read_config()
+                self._stop_event.wait(config.detection_interval_seconds)
+            except Exception:
+                # Keep loop alive even if one iteration fails (camera/DB/model transient errors).
+                print("[DETECTION_LOOP] iteration error:")
+                print(traceback.format_exc())
+                self._stop_event.wait(0.5)
 
 
 detection_loop = DetectionLoop()

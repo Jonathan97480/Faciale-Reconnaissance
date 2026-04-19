@@ -25,10 +25,17 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="Face Recognition API", lifespan=lifespan)
 
-    frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    frontend_origins = os.getenv("FRONTEND_ORIGINS")
+    if not frontend_origins:
+        legacy_frontend_origin = os.getenv("FRONTEND_ORIGIN")
+        if legacy_frontend_origin:
+            frontend_origins = legacy_frontend_origin
+        else:
+            frontend_origins = "http://localhost:5173,http://127.0.0.1:5173"
+    allow_origins = [origin.strip() for origin in frontend_origins.split(",") if origin.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[frontend_origin],
+        allow_origins=allow_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["content-type", "authorization", "x-api-key", "x-admin-api-key"],

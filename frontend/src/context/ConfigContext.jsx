@@ -18,9 +18,10 @@ export function ConfigProvider({ children }) {
           setConfig(data);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (mounted) {
-          setError("Impossible de charger la configuration.");
+          const detail = err instanceof Error ? err.message : "erreur inconnue";
+          setError(`Impossible de charger la configuration (${detail}).`);
         }
       })
       .finally(() => {

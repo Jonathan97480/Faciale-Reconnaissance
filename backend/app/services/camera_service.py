@@ -2,6 +2,7 @@
 import os
 import threading
 import time
+import traceback
 
 import cv2
 
@@ -93,39 +94,44 @@ class SharedCameraRuntime:
 
     def _run(self) -> None:
         while not self._stop_event.is_set():
-            self._switch_camera_if_needed()
+            try:
+                self._switch_camera_if_needed()
 
-            if self._capture is None or not self._capture.isOpened():
+                if self._capture is None or not self._capture.isOpened():
+                    self._stop_event.wait(0.2)
+                    continue
+
+                ret, frame = self._capture.read()
+                if not ret:
+                    self._stop_event.wait(0.05)
+                    continue
+
+                preview_frame = frame.copy()
+                with self._annotations_lock:
+                    current_annotations = list(self._annotations)
+                for (left, top, right, bottom), label, color in current_annotations:
+                    cv2.rectangle(preview_frame, (left, top), (right, bottom), color, 2)
+                    cv2.putText(
+                        preview_frame, label,
+                        (left, max(0, top - 8)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
+                    )
+
+                success, encoded = cv2.imencode(".jpg", preview_frame)
+                if not success:
+                    self._stop_event.wait(0.02)
+                    continue
+
+                with self._frame_lock:
+                    self._latest_frame = frame
+                    self._latest_jpeg = encoded.tobytes()
+
+                # ~30 FPS preview target.
+                self._stop_event.wait(0.03)
+            except Exception:
+                print("[CAMERA_RUNTIME] capture loop error:")
+                print(traceback.format_exc())
                 self._stop_event.wait(0.2)
-                continue
-
-            ret, frame = self._capture.read()
-            if not ret:
-                self._stop_event.wait(0.05)
-                continue
-
-            preview_frame = frame.copy()
-            with self._annotations_lock:
-                current_annotations = list(self._annotations)
-            for (left, top, right, bottom), label, color in current_annotations:
-                cv2.rectangle(preview_frame, (left, top), (right, bottom), color, 2)
-                cv2.putText(
-                    preview_frame, label,
-                    (left, max(0, top - 8)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
-                )
-
-            success, encoded = cv2.imencode(".jpg", preview_frame)
-            if not success:
-                self._stop_event.wait(0.02)
-                continue
-
-            with self._frame_lock:
-                self._latest_frame = frame
-                self._latest_jpeg = encoded.tobytes()
-
-            # ~30 FPS preview target.
-            self._stop_event.wait(0.03)
 
         self._release_capture()
 
@@ -134,21 +140,25 @@ class SharedCameraRuntime:
         from app.services.recognition_service import recognize_face
 
         while not self._stop_event.is_set():
-            frame = self.get_latest_frame()
-            if frame is not None:
-                face_data = extract_faces_with_boxes(frame)
-                annotations = []
-                for box, embedding in face_data:
-                    result = recognize_face(embedding)
-                    if result.status == "reconnu" and result.face_name:
-                        label = result.face_name
-                        color = (0, 255, 0)   # vert = reconnu
-                    else:
-                        label = "inconnu"
-                        color = (0, 165, 255)  # orange = inconnu
-                    annotations.append((box, label, color))
-                with self._annotations_lock:
-                    self._annotations = annotations
+            try:
+                frame = self.get_latest_frame()
+                if frame is not None:
+                    face_data = extract_faces_with_boxes(frame)
+                    annotations = []
+                    for box, embedding in face_data:
+                        result = recognize_face(embedding)
+                        if result.status == "reconnu" and result.face_name:
+                            label = result.face_name
+                            color = (0, 255, 0)   # vert = reconnu
+                        else:
+                            label = "inconnu"
+                            color = (0, 165, 255)  # orange = inconnu
+                        annotations.append((box, label, color))
+                    with self._annotations_lock:
+                        self._annotations = annotations
+            except Exception:
+                print("[CAMERA_RUNTIME] annotation loop error:")
+                print(traceback.format_exc())
             self._stop_event.wait(1.0)
 
 
