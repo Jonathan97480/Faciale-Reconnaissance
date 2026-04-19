@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import random
 import sys
 import time
 from typing import Iterator
@@ -166,40 +167,139 @@ def configure_camera_stream(stream_url: str, mode: str) -> None:
     )
 
 
-def _build_stream_generator(video_path: str, fps: float) -> Iterator[bytes]:
+def _render_debug_overlay(frame, source_name: str):
+    text = time.strftime("%Y-%m-%d %H:%M:%S")
+    cv2.putText(
+        frame,
+        f"{source_name} | {text}",
+        (12, 24),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.6,
+        (255, 255, 255),
+        2,
+    )
+    return frame
+
+
+def _build_stream_generator(
+    video_path: str,
+    fps: float,
+    simulate_real_camera: bool,
+    jitter_ms: int,
+    drop_frame_probability: float,
+    freeze_probability: float,
+    freeze_seconds: float,
+    outage_probability: float,
+    outage_seconds: float,
+    seed: int | None,
+) -> Iterator[bytes]:
     delay_seconds = max(0.01, 1.0 / max(1.0, fps))
+    rng = random.Random(seed)
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open video: {video_path}")
+    last_encoded: bytes | None = None
+    source_name = os.path.basename(video_path)
     try:
         while True:
+            if simulate_real_camera and rng.random() < outage_probability:
+                time.sleep(max(0.1, outage_seconds))
+                continue
+
             ok, frame = cap.read()
             if not ok:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
-            ok_enc, encoded = cv2.imencode(".jpg", frame)
-            if not ok_enc:
+
+            frame = _render_debug_overlay(frame, source_name)
+
+            if simulate_real_camera and rng.random() < drop_frame_probability:
+                jitter = rng.uniform(-jitter_ms / 1000.0, jitter_ms / 1000.0)
+                time.sleep(max(0.005, delay_seconds + jitter))
                 continue
-            yield (
-                b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n\r\n" + encoded.tobytes() + b"\r\n"
-            )
-            time.sleep(delay_seconds)
+
+            ok_enc, encoded = cv2.imencode(".jpg", frame)
+            if ok_enc:
+                last_encoded = encoded.tobytes()
+
+            if last_encoded is not None:
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + last_encoded + b"\r\n"
+                )
+
+            if (
+                simulate_real_camera
+                and last_encoded is not None
+                and rng.random() < freeze_probability
+            ):
+                freeze_until = time.monotonic() + max(0.1, freeze_seconds)
+                while time.monotonic() < freeze_until:
+                    yield (
+                        b"--frame\r\n"
+                        b"Content-Type: image/jpeg\r\n\r\n" + last_encoded + b"\r\n"
+                    )
+                    jitter = rng.uniform(-jitter_ms / 1000.0, jitter_ms / 1000.0)
+                    time.sleep(max(0.005, delay_seconds + jitter))
+
+            if simulate_real_camera:
+                jitter = rng.uniform(-jitter_ms / 1000.0, jitter_ms / 1000.0)
+                time.sleep(max(0.005, delay_seconds + jitter))
+            else:
+                time.sleep(delay_seconds)
     finally:
         cap.release()
 
 
-def run_mjpeg_stream(video_path: str, host: str, port: int, path: str, fps: float) -> None:
+def run_mjpeg_stream(
+    video_path: str,
+    host: str,
+    port: int,
+    path: str,
+    fps: float,
+    simulate_real_camera: bool,
+    jitter_ms: int,
+    drop_frame_probability: float,
+    freeze_probability: float,
+    freeze_seconds: float,
+    outage_probability: float,
+    outage_seconds: float,
+    seed: int | None,
+) -> None:
     app = FastAPI(title="Dev Movie MJPEG Stream")
 
     @app.get(path)
     def stream():
         return StreamingResponse(
-            _build_stream_generator(video_path, fps),
+            _build_stream_generator(
+                video_path=video_path,
+                fps=fps,
+                simulate_real_camera=simulate_real_camera,
+                jitter_ms=max(0, jitter_ms),
+                drop_frame_probability=max(0.0, min(1.0, drop_frame_probability)),
+                freeze_probability=max(0.0, min(1.0, freeze_probability)),
+                freeze_seconds=max(0.1, freeze_seconds),
+                outage_probability=max(0.0, min(1.0, outage_probability)),
+                outage_seconds=max(0.1, outage_seconds),
+                seed=seed,
+            ),
             media_type="multipart/x-mixed-replace; boundary=frame",
         )
 
     print(f"Stream URL: http://{host}:{port}{path}")
+    if simulate_real_camera:
+        print(
+            "Simulation mode ON:",
+            {
+                "jitter_ms": jitter_ms,
+                "drop_frame_probability": drop_frame_probability,
+                "freeze_probability": freeze_probability,
+                "freeze_seconds": freeze_seconds,
+                "outage_probability": outage_probability,
+                "outage_seconds": outage_seconds,
+                "seed": seed,
+            },
+        )
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 
@@ -223,6 +323,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_stream.add_argument("--port", type=int, default=8090)
     p_stream.add_argument("--path", default="/stream.mjpg")
     p_stream.add_argument("--fps", type=float, default=10.0)
+    p_stream.add_argument("--simulate-real-camera", action="store_true")
+    p_stream.add_argument("--jitter-ms", type=int, default=120)
+    p_stream.add_argument("--drop-frame-probability", type=float, default=0.03)
+    p_stream.add_argument("--freeze-probability", type=float, default=0.02)
+    p_stream.add_argument("--freeze-seconds", type=float, default=0.8)
+    p_stream.add_argument("--outage-probability", type=float, default=0.005)
+    p_stream.add_argument("--outage-seconds", type=float, default=2.0)
+    p_stream.add_argument("--seed", type=int, default=None)
 
     return parser
 
@@ -251,6 +359,14 @@ def main() -> None:
             port=args.port,
             path=args.path,
             fps=args.fps,
+            simulate_real_camera=bool(args.simulate_real_camera),
+            jitter_ms=args.jitter_ms,
+            drop_frame_probability=args.drop_frame_probability,
+            freeze_probability=args.freeze_probability,
+            freeze_seconds=args.freeze_seconds,
+            outage_probability=args.outage_probability,
+            outage_seconds=args.outage_seconds,
+            seed=args.seed,
         )
         return
 

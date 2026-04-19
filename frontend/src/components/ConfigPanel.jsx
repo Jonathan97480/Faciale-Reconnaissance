@@ -7,6 +7,17 @@ export default function ConfigPanel() {
   const [local, setLocal] = useState(null);
   const [status, setStatus] = useState("");
   const [newNetworkSource, setNewNetworkSource] = useState("");
+  const [newCameraProfile, setNewCameraProfile] = useState({
+    name: "",
+    protocol: "rtsp",
+    host: "",
+    port: 554,
+    path: "/stream1",
+    username: "",
+    password: "",
+    onvif_url: "",
+    enabled: true,
+  });
 
   if (loading) {
     return <section className="panel"><h2>Configuration</h2><p>Chargement...</p></section>;
@@ -34,6 +45,20 @@ export default function ConfigPanel() {
         .map((source) => String(source).trim())
         .filter((source, index, arr) => source && arr.indexOf(source) === index)
         .slice(0, 10);
+      const sanitizedProfiles = (draft.network_camera_profiles ?? [])
+        .map((profile) => ({
+          ...profile,
+          name: String(profile.name ?? "").trim(),
+          host: String(profile.host ?? "").trim(),
+          path: String(profile.path ?? "/"),
+          username: String(profile.username ?? ""),
+          password: String(profile.password ?? ""),
+          onvif_url: String(profile.onvif_url ?? ""),
+          port: Number(profile.port ?? 554),
+          enabled: Boolean(profile.enabled),
+        }))
+        .filter((profile) => profile.name && profile.host)
+        .slice(0, 10);
 
       await saveConfig({
         detection_interval_seconds: Number(draft.detection_interval_seconds),
@@ -41,6 +66,7 @@ export default function ConfigPanel() {
         camera_index: Number(draft.camera_index),
         camera_source: draft.camera_source ?? "",
         network_camera_sources: sanitizedNetworkSources,
+        network_camera_profiles: sanitizedProfiles,
         multi_camera_cycle_budget_seconds: Number(draft.multi_camera_cycle_budget_seconds),
         enroll_frames_count: Number(draft.enroll_frames_count),
         face_crop_padding_ratio: Number(draft.face_crop_padding_ratio),
@@ -76,6 +102,47 @@ export default function ConfigPanel() {
     onChange(
       "network_camera_sources",
       current.filter((source) => source !== sourceToRemove)
+    );
+    setStatus("");
+  };
+
+  const addCameraProfile = () => {
+    const profile = {
+      ...newCameraProfile,
+      name: String(newCameraProfile.name).trim(),
+      host: String(newCameraProfile.host).trim(),
+      path: String(newCameraProfile.path || "/"),
+      port: Number(newCameraProfile.port || 554),
+    };
+    if (!profile.name || !profile.host) {
+      setStatus("Nom et host requis pour le profil camera.");
+      return;
+    }
+    const current = draft.network_camera_profiles ?? [];
+    if (current.length >= 10) {
+      setStatus("Maximum 10 profils camera.");
+      return;
+    }
+    onChange("network_camera_profiles", [...current, profile]);
+    setNewCameraProfile({
+      name: "",
+      protocol: "rtsp",
+      host: "",
+      port: 554,
+      path: "/stream1",
+      username: "",
+      password: "",
+      onvif_url: "",
+      enabled: true,
+    });
+    setStatus("");
+  };
+
+  const removeCameraProfile = (indexToRemove) => {
+    const current = draft.network_camera_profiles ?? [];
+    onChange(
+      "network_camera_profiles",
+      current.filter((_, index) => index !== indexToRemove)
     );
     setStatus("");
   };
@@ -180,6 +247,98 @@ export default function ConfigPanel() {
               <li key={source} className="history-row">
                 <span>{source}</span>
                 <button type="button" onClick={() => removeNetworkSource(source)}>Supprimer</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="panel" style={{ marginTop: 10 }}>
+        <h3>Profils camera standards (RTSP/MJPEG/HTTP/HLS)</h3>
+        <div className="field-grid">
+          <label>
+            Nom
+            <input
+              type="text"
+              value={newCameraProfile.name}
+              onChange={(event) => setNewCameraProfile({ ...newCameraProfile, name: event.target.value })}
+            />
+          </label>
+          <label>
+            Protocole
+            <select
+              value={newCameraProfile.protocol}
+              onChange={(event) => setNewCameraProfile({ ...newCameraProfile, protocol: event.target.value })}
+            >
+              <option value="rtsp">RTSP</option>
+              <option value="mjpeg">MJPEG</option>
+              <option value="http">HTTP</option>
+              <option value="hls">HLS</option>
+            </select>
+          </label>
+          <label>
+            Host/IP
+            <input
+              type="text"
+              value={newCameraProfile.host}
+              onChange={(event) => setNewCameraProfile({ ...newCameraProfile, host: event.target.value })}
+            />
+          </label>
+          <label>
+            Port
+            <input
+              type="number"
+              min="1"
+              max="65535"
+              value={newCameraProfile.port}
+              onChange={(event) => setNewCameraProfile({ ...newCameraProfile, port: event.target.value })}
+            />
+          </label>
+          <label>
+            Path stream
+            <input
+              type="text"
+              value={newCameraProfile.path}
+              onChange={(event) => setNewCameraProfile({ ...newCameraProfile, path: event.target.value })}
+            />
+          </label>
+          <label>
+            Username
+            <input
+              type="text"
+              value={newCameraProfile.username}
+              onChange={(event) => setNewCameraProfile({ ...newCameraProfile, username: event.target.value })}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={newCameraProfile.password}
+              onChange={(event) => setNewCameraProfile({ ...newCameraProfile, password: event.target.value })}
+            />
+          </label>
+          <label>
+            URL ONVIF (optionnel)
+            <input
+              type="text"
+              value={newCameraProfile.onvif_url}
+              onChange={(event) => setNewCameraProfile({ ...newCameraProfile, onvif_url: event.target.value })}
+            />
+          </label>
+        </div>
+        <div className="button-row" style={{ marginTop: 8 }}>
+          <button type="button" onClick={addCameraProfile}>Ajouter profil camera</button>
+        </div>
+        {(draft.network_camera_profiles ?? []).length === 0 && (
+          <p className="status-line">Aucun profil camera standard configure.</p>
+        )}
+        {(draft.network_camera_profiles ?? []).length > 0 && (
+          <ul className="history-list">
+            {(draft.network_camera_profiles ?? []).map((profile, index) => (
+              <li key={`${profile.name}-${index}`} className="history-row">
+                <span>{profile.name}</span>
+                <span>{profile.protocol.toUpperCase()} {profile.host}:{profile.port}{profile.path}</span>
+                <button type="button" onClick={() => removeCameraProfile(index)}>Supprimer</button>
               </li>
             ))}
           </ul>

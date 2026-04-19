@@ -3,12 +3,26 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class NetworkCameraProfile(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    protocol: Literal["rtsp", "mjpeg", "http", "hls"] = "rtsp"
+    host: str = Field(min_length=1, max_length=255)
+    port: int = Field(default=554, ge=1, le=65535)
+    path: str = Field(default="/")
+    username: str = Field(default="")
+    password: str = Field(default="")
+    has_password: bool = False
+    onvif_url: str = Field(default="")
+    enabled: bool = True
+
+
 class ConfigPayload(BaseModel):
     detection_interval_seconds: float = Field(gt=0)
     match_threshold: float = Field(ge=0, le=1)
     camera_index: int = Field(ge=0)
     camera_source: str = Field(default="", description="URL réseau, chemin vidéo, ou vide pour webcam locale")
     network_camera_sources: list[str] = Field(default_factory=list, max_length=10)
+    network_camera_profiles: list[NetworkCameraProfile] = Field(default_factory=list, max_length=10)
     multi_camera_cycle_budget_seconds: float = Field(default=2.0, gt=0.1, le=10)
     enroll_frames_count: int = Field(default=5, ge=1, le=30)
     face_crop_padding_ratio: float = Field(default=0.2, ge=0, le=1)

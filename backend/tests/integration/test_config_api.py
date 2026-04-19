@@ -12,6 +12,7 @@ def test_get_and_update_config(monkeypatch, tmp_path):
         assert initial.status_code == 200
         assert initial.json()["detection_interval_seconds"] == 3
         assert initial.json()["network_camera_sources"] == []
+        assert initial.json()["network_camera_profiles"] == []
         assert initial.json()["multi_camera_cycle_budget_seconds"] == 2
 
         payload = {
@@ -23,14 +24,35 @@ def test_get_and_update_config(monkeypatch, tmp_path):
                 "rtsp://camera-1",
                 "rtsp://camera-2",
             ],
+            "network_camera_profiles": [
+                {
+                    "name": "Cam RTSP Standard",
+                    "protocol": "rtsp",
+                    "host": "192.168.1.10",
+                    "port": 554,
+                    "path": "/stream1",
+                    "username": "admin",
+                    "password": "admin",
+                    "onvif_url": "",
+                    "enabled": True,
+                }
+            ],
             "multi_camera_cycle_budget_seconds": 2,
             "enroll_frames_count": 8,
             "face_crop_padding_ratio": 0.25,
         }
         updated = client.put("/api/config", json=payload)
         assert updated.status_code == 200
-        assert updated.json() == payload
+        expected = dict(payload)
+        expected["network_camera_profiles"] = [
+            {
+                **payload["network_camera_profiles"][0],
+                "password": "",
+                "has_password": True,
+            }
+        ]
+        assert updated.json() == expected
 
         round_trip = client.get("/api/config")
         assert round_trip.status_code == 200
-        assert round_trip.json() == payload
+        assert round_trip.json() == expected

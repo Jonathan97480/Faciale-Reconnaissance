@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import config, enrollment, faces, production_recognition, recognition
+from app.api.routes import cameras, config, enrollment, faces, production_recognition, recognition
 from app.core.database import init_db
 from app.services.camera_service import stop_camera_runtime
 from app.services.detection_loop import detection_loop
@@ -49,6 +49,7 @@ def create_app() -> FastAPI:
     app.include_router(enrollment.router, prefix="/api")
     app.include_router(recognition.router, prefix="/api")
     app.include_router(production_recognition.router, prefix="/api")
+    app.include_router(cameras.router, prefix="/api")
 
     # Ajout du router admin batch logs
     from app.api.routes import admin_batch_logs

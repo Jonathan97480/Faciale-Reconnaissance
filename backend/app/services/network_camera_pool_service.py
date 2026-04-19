@@ -4,6 +4,9 @@ import traceback
 
 import cv2
 
+from app.services.camera_event_log_service import log_camera_event
+from app.services.detection_runtime_state import get_source_annotations_updated_at
+
 
 class NetworkCameraWorker:
     def __init__(self, source: str) -> None:
@@ -14,6 +17,11 @@ class NetworkCameraWorker:
         self._thread: threading.Thread | None = None
         self._capture = None
         self._latest_frame = None
+        self._latest_frame_at: float | None = None
+        self._last_error: str | None = None
+        self._consecutive_failures = 0
+        self._last_read_duration_ms = 0.0
+        self._last_connect_at: float | None = None
 
     def start(self) -> None:
         with self._control_lock:
@@ -37,6 +45,33 @@ class NetworkCameraWorker:
                 return None
             return self._latest_frame.copy()
 
+    def stats(self) -> dict[str, object]:
+        with self._frame_lock:
+            latest_frame_at = self._latest_frame_at
+        return {
+            "source": self.source,
+            "is_running": bool(self._thread and self._thread.is_alive()),
+            "has_frame": latest_frame_at is not None,
+            "latest_frame_at": latest_frame_at,
+            "last_detection_at": get_source_annotations_updated_at(self.source),
+            "last_error": self._last_error,
+            "consecutive_failures": self._consecutive_failures,
+            "last_read_duration_ms": round(self._last_read_duration_ms, 2),
+            "last_connect_at": self._last_connect_at,
+        }
+
+    def _set_error(self, message: str) -> None:
+        if message == self._last_error:
+            self._consecutive_failures += 1
+            return
+        self._last_error = message
+        self._consecutive_failures += 1
+        log_camera_event(self.source, "error", message)
+
+    def _set_success(self) -> None:
+        self._last_error = None
+        self._consecutive_failures = 0
+
     def _release_capture(self) -> None:
         if self._capture is not None:
             self._capture.release()
@@ -47,6 +82,11 @@ class NetworkCameraWorker:
             return
         self._release_capture()
         self._capture = cv2.VideoCapture(self.source)
+        if self._capture is not None and self._capture.isOpened():
+            self._last_connect_at = time.time()
+            log_camera_event(self.source, "connect", "Stream connected")
+        else:
+            self._set_error("Cannot open stream")
 
     def _run(self) -> None:
         while not self._stop_event.is_set():
@@ -56,16 +96,22 @@ class NetworkCameraWorker:
                     self._stop_event.wait(0.2)
                     continue
 
+                read_started = time.monotonic()
                 ok, frame = self._capture.read()
+                self._last_read_duration_ms = (time.monotonic() - read_started) * 1000.0
                 if not ok:
+                    self._set_error("Capture read failed")
                     self._release_capture()
                     self._stop_event.wait(0.05)
                     continue
 
                 with self._frame_lock:
                     self._latest_frame = frame
+                    self._latest_frame_at = time.time()
+                self._set_success()
                 self._stop_event.wait(0.03)
             except Exception:
+                self._set_error("Worker exception")
                 print(f"[NETWORK_CAMERA_WORKER] source={self.source} error:")
                 print(traceback.format_exc())
                 self._stop_event.wait(0.2)
@@ -93,6 +139,7 @@ class NetworkCameraPool:
             for source in current_sources - desired_sources:
                 worker = self._workers.pop(source)
                 worker.stop()
+                log_camera_event(source, "stop", "Source removed from runtime")
 
             for source in unique_sources:
                 if source in self._workers:
@@ -100,6 +147,7 @@ class NetworkCameraPool:
                 worker = NetworkCameraWorker(source)
                 worker.start()
                 self._workers[source] = worker
+                log_camera_event(source, "start", "Source added to runtime")
 
     def collect_frames(self) -> list[tuple[str, object]]:
         with self._lock:
@@ -131,10 +179,12 @@ class NetworkCameraPool:
 
     def status(self) -> dict[str, object]:
         with self._lock:
-            sources = list(self._workers.keys())
+            items = list(self._workers.items())
+        source_stats = [worker.stats() for _, worker in items]
         return {
-            "configured_sources_count": len(sources),
-            "configured_sources": sources,
+            "configured_sources_count": len(source_stats),
+            "configured_sources": [item["source"] for item in source_stats],
+            "sources": source_stats,
         }
 
 

@@ -13,6 +13,7 @@ export default function MonitoringPanel() {
   const [status, setStatus] = useState("");
   const [cameraStatus, setCameraStatus] = useState("Apercu flux actif.");
   const [feedStatus, setFeedStatus] = useState({});
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const [mainFeedKey, setMainFeedKey] = useState("local");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const streamWrapRef = useRef(null);
@@ -122,7 +123,13 @@ export default function MonitoringPanel() {
 
   const detectedFaces = latestDetection?.faces ?? [];
   const hasUnknownFace = detectedFaces.some((face) => face.status === "inconnu");
-  const networkSources = runtimeConfig?.network_camera_sources ?? [];
+  const networkSources =
+    loopState?.network_cameras?.configured_sources ??
+    runtimeConfig?.network_camera_sources ??
+    [];
+  const sourceRuntimeMap = Object.fromEntries(
+    (loopState?.network_cameras?.sources ?? []).map((item) => [item.source, item])
+  );
   const allFeeds = [
     { key: "local", label: "Camera locale", type: "local", source: "" },
     ...networkSources.map((source, index) => ({
@@ -141,10 +148,17 @@ export default function MonitoringPanel() {
     }
   }, [mainFeedKey, allFeeds]);
 
+  useEffect(() => {
+    if (currentMainFeed.type !== "network" && audioEnabled) {
+      setAudioEnabled(false);
+    }
+  }, [currentMainFeed.type, audioEnabled]);
+
   const mainFeedUrl =
     currentMainFeed.type === "local"
       ? apiClient.getRecognitionPreviewStreamUrl()
       : apiClient.getNetworkPreviewStreamUrl(currentMainFeed.source);
+  const useNetworkVideoElement = currentMainFeed.type === "network" && audioEnabled;
 
   return (
     <section className="panel">
@@ -155,18 +169,38 @@ export default function MonitoringPanel() {
       )}
       <h2>Monitoring</h2>
       <div className={`stream-wrap ${isFullscreen ? "fullscreen" : ""}`} ref={streamWrapRef}>
-        <img
-          src={mainFeedUrl}
-          alt={`Apercu ${currentMainFeed.label}`}
-          onError={() => {
-            setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: false }));
-            setCameraStatus(`Flux principal indisponible (${currentMainFeed.label}).`);
-          }}
-          onLoad={() => {
-            setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: true }));
-            setCameraStatus(`Flux principal actif (${currentMainFeed.label}).`);
-          }}
-        />
+        {useNetworkVideoElement ? (
+          <video
+            src={currentMainFeed.source}
+            autoPlay
+            playsInline
+            muted={!audioEnabled}
+            onError={() => {
+              setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: false }));
+              setAudioEnabled(false);
+              setCameraStatus(
+                `Audio non supporte par ce flux (${currentMainFeed.label}). Retour en mode preview.`
+              );
+            }}
+            onLoadedData={() => {
+              setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: true }));
+              setCameraStatus(`Flux principal actif (${currentMainFeed.label}).`);
+            }}
+          />
+        ) : (
+          <img
+            src={mainFeedUrl}
+            alt={`Apercu ${currentMainFeed.label}`}
+            onError={() => {
+              setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: false }));
+              setCameraStatus(`Flux principal indisponible (${currentMainFeed.label}).`);
+            }}
+            onLoad={() => {
+              setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: true }));
+              setCameraStatus(`Flux principal actif (${currentMainFeed.label}).`);
+            }}
+          />
+        )}
         <div className="hud-overlay">
           <div className="hud-corners" />
           <div className="hud-topline">TACTICAL IDENT / {currentMainFeed.label.toUpperCase()}</div>
@@ -211,6 +245,13 @@ export default function MonitoringPanel() {
                     </span>
                   </div>
                   <p className="stream-source">{feed.type === "local" ? "camera locale" : feed.source}</p>
+                  {feed.type === "network" && sourceRuntimeMap[feed.source] && (
+                    <p className="stream-source">
+                      {sourceRuntimeMap[feed.source].last_error
+                        ? `Erreur: ${sourceRuntimeMap[feed.source].last_error}`
+                        : `OK | read=${sourceRuntimeMap[feed.source].last_read_duration_ms}ms`}
+                    </p>
+                  )}
                   <div className="stream-mini-wrap">
                     <img
                       src={feedUrl}
@@ -231,6 +272,11 @@ export default function MonitoringPanel() {
       </section>
       <div className="button-row">
         <button onClick={runCheck}>Lancer verification manuelle</button>
+        {currentMainFeed.type === "network" && (
+          <button onClick={() => setAudioEnabled((prev) => !prev)}>
+            {audioEnabled ? "Couper son" : "Activer son"}
+          </button>
+        )}
         <button onClick={toggleFullscreen}>{isFullscreen ? "Quitter plein ecran" : "Plein ecran HUD"}</button>
         <button
           onClick={async () => {

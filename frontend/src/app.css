@@ -206,7 +206,8 @@ button:disabled {
   background: #000;
 }
 
-.stream-wrap img {
+.stream-wrap img,
+.stream-wrap video {
   width: 100%;
   min-height: 360px;
   max-height: 520px;
@@ -221,7 +222,8 @@ button:disabled {
   border-radius: 0;
 }
 
-.stream-wrap.fullscreen img {
+.stream-wrap.fullscreen img,
+.stream-wrap.fullscreen video {
   width: 100vw;
   height: 100vh;
   max-height: none;

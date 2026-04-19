@@ -8,6 +8,7 @@ DEFAULT_CONFIG = {
     "camera_index": "0",
     "camera_source": "",  # vide = webcam locale, sinon URL ou chemin
     "network_camera_sources_json": "[]",
+    "network_camera_profiles_json": "[]",
     "multi_camera_cycle_budget_seconds": "2",
     "enroll_frames_count": "5",
     "face_crop_padding_ratio": "0.2",
@@ -91,6 +92,17 @@ def init_db() -> None:
                 error_count INTEGER NOT NULL,
                 client_ip TEXT,
                 user_agent TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS camera_stream_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                message TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """

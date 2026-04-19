@@ -40,3 +40,26 @@ def test_rejects_more_than_ten_network_camera_sources():
             camera_index=0,
             network_camera_sources=[f"rtsp://cam-{idx}" for idx in range(11)],
         )
+
+
+def test_rejects_more_than_ten_network_camera_profiles():
+    with pytest.raises(ValidationError):
+        ConfigPayload(
+            detection_interval_seconds=3,
+            match_threshold=0.7,
+            camera_index=0,
+            network_camera_profiles=[
+                {
+                    "name": f"Cam {idx}",
+                    "protocol": "rtsp",
+                    "host": f"192.168.1.{idx+1}",
+                    "port": 554,
+                    "path": "/stream",
+                    "username": "",
+                    "password": "",
+                    "onvif_url": "",
+                    "enabled": True,
+                }
+                for idx in range(11)
+            ],
+        )

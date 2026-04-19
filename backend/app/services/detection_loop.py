@@ -4,13 +4,15 @@ import traceback
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 from app.services.camera_service import capture_frame
+from app.services.camera_profile_url_service import build_enabled_profile_urls
 from app.services.config_service import read_config
-from app.services.encoder_service import extract_embeddings
+from app.services.detection_runtime_state import set_source_annotations
+from app.services.encoder_service import extract_faces_with_boxes
 from app.services.network_camera_pool_service import (
     collect_network_camera_frames,
     sync_network_camera_sources,
 )
-from app.services.recognition_service import recognize_faces, save_detection
+from app.services.recognition_service import recognize_face, save_detection
 
 
 class DetectionLoop:
@@ -35,34 +37,53 @@ class DetectionLoop:
         return {"running": running}
 
     @staticmethod
-    def _process_frame(frame) -> list:
-        embeddings = extract_embeddings(frame)
-        return recognize_faces(embeddings)
+    def _process_frame(frame) -> tuple[list, list[tuple]]:
+        results = []
+        annotations = []
+        for box, embedding in extract_faces_with_boxes(frame):
+            result = recognize_face(embedding)
+            results.append(result)
+            if result.status == "reconnu" and result.face_name:
+                label = result.face_name
+                color = (0, 255, 0)
+            else:
+                label = "inconnu"
+                color = (0, 165, 255)
+            annotations.append((box, label, color))
+        return results, annotations
 
     def _run(self) -> None:
         while not self._stop_event.is_set():
             try:
                 config = read_config()
+                profile_urls = build_enabled_profile_urls(config.network_camera_profiles)
+                merged_network_sources = list(config.network_camera_sources)
+                for url in profile_urls:
+                    if url not in merged_network_sources:
+                        merged_network_sources.append(url)
                 sync_network_camera_sources(
-                    config.network_camera_sources,
+                    merged_network_sources,
                     max_sources=10,
                 )
 
-                frames = []
+                frame_items: list[tuple[str, object]] = []
                 primary_frame = capture_frame()
                 if primary_frame is not None:
-                    frames.append(primary_frame)
-                frames.extend([frame for _, frame in collect_network_camera_frames()])
+                    frame_items.append(("local", primary_frame))
+                frame_items.extend(collect_network_camera_frames())
 
                 cycle_budget_seconds = config.multi_camera_cycle_budget_seconds
                 started_at = time.monotonic()
                 all_results = []
 
-                if frames:
-                    max_workers = max(1, min(len(frames), 10))
+                if frame_items:
+                    max_workers = max(1, min(len(frame_items), 10))
                     executor = ThreadPoolExecutor(max_workers=max_workers)
                     try:
-                        futures = {executor.submit(self._process_frame, frame) for frame in frames}
+                        futures = {
+                            executor.submit(self._process_frame, frame): source
+                            for source, frame in frame_items
+                        }
                         while futures:
                             remaining = cycle_budget_seconds - (time.monotonic() - started_at)
                             if remaining <= 0:
@@ -73,12 +94,16 @@ class DetectionLoop:
                                 return_when=FIRST_COMPLETED,
                             )
                             for future in done:
+                                source = futures.get(future, "")
                                 try:
-                                    all_results.extend(future.result())
+                                    results, annotations = future.result()
+                                    all_results.extend(results)
+                                    if source:
+                                        set_source_annotations(source, annotations)
                                 except Exception:
                                     print("[DETECTION_LOOP] frame processing error:")
                                     print(traceback.format_exc())
-                            futures = pending
+                            futures = {future: futures[future] for future in pending}
                     finally:
                         executor.shutdown(wait=False, cancel_futures=True)
 
