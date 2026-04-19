@@ -68,6 +68,11 @@ bash install-linux.sh
 cd backend
 pip install -r requirements.txt
 ```
+- Option GPU NVIDIA (CUDA, recommande pour perf):
+```bash
+cd backend
+pip install --upgrade torch==2.2.2+cu121 torchvision==0.17.2+cu121 torchaudio==2.2.2+cu121 --index-url https://download.pytorch.org/whl/cu121
+```
 - Frontend:
 ```bash
 cd frontend
@@ -118,6 +123,7 @@ Champs principaux:
 - `multi_camera_cycle_budget_seconds` (defaut: `2.0`)
 - `enroll_frames_count`
 - `face_crop_padding_ratio`
+- `inference_device_preference` (`auto|cpu|cuda`)
 
 Notes:
 
@@ -126,6 +132,8 @@ Notes:
 - `network_camera_profiles` permet de declarer des cameras par norme/protocole
 - la webcam locale reste utilisable en parallele des flux reseau
 - les mots de passe des profils sont masques dans `GET /api/config`
+- en mode `auto`, le backend utilise le GPU CUDA si disponible, sinon CPU
+- `requirements.txt` installe une pile CPU par defaut; pour CUDA, utiliser la commande GPU ci-dessus
 
 ## Endpoints camera supplementaires
 

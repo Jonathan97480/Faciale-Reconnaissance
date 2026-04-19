@@ -6,6 +6,7 @@ import traceback
 
 import cv2
 
+from app.services.detection_runtime_state import get_source_annotations
 from app.services.config_service import read_config
 
 def _open_capture(camera_index: int = 0, camera_source: str = ""):
@@ -27,16 +28,13 @@ class SharedCameraRuntime:
     def __init__(self) -> None:
         self._control_lock = threading.Lock()
         self._frame_lock = threading.Lock()
-        self._annotations_lock = threading.Lock()
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
-        self._annotation_thread: threading.Thread | None = None
         self._capture = None
         self._camera_index: int | None = None
         self._camera_source: str | None = None
         self._latest_frame = None
         self._latest_jpeg: bytes | None = None
-        self._annotations: list = []
 
     def start(self) -> None:
         with self._control_lock:
@@ -45,14 +43,10 @@ class SharedCameraRuntime:
             self._stop_event.clear()
             self._thread = threading.Thread(target=self._run, daemon=True)
             self._thread.start()
-            self._annotation_thread = threading.Thread(
-                target=self._annotate_run, daemon=True
-            )
-            self._annotation_thread.start()
 
     def stop(self) -> None:
         self._stop_event.set()
-        for thread in (self._thread, self._annotation_thread):
+        for thread in (self._thread,):
             if thread and thread.is_alive():
                 thread.join(timeout=2)
         with self._control_lock:
@@ -107,8 +101,7 @@ class SharedCameraRuntime:
                     continue
 
                 preview_frame = frame.copy()
-                with self._annotations_lock:
-                    current_annotations = list(self._annotations)
+                current_annotations = get_source_annotations("local")
                 for (left, top, right, bottom), label, color in current_annotations:
                     cv2.rectangle(preview_frame, (left, top), (right, bottom), color, 2)
                     cv2.putText(
@@ -134,32 +127,6 @@ class SharedCameraRuntime:
                 self._stop_event.wait(0.2)
 
         self._release_capture()
-
-    def _annotate_run(self) -> None:
-        from app.services.encoder_service import extract_faces_with_boxes
-        from app.services.recognition_service import recognize_face
-
-        while not self._stop_event.is_set():
-            try:
-                frame = self.get_latest_frame()
-                if frame is not None:
-                    face_data = extract_faces_with_boxes(frame)
-                    annotations = []
-                    for box, embedding in face_data:
-                        result = recognize_face(embedding)
-                        if result.status == "reconnu" and result.face_name:
-                            label = result.face_name
-                            color = (0, 255, 0)   # vert = reconnu
-                        else:
-                            label = "inconnu"
-                            color = (0, 165, 255)  # orange = inconnu
-                        annotations.append((box, label, color))
-                    with self._annotations_lock:
-                        self._annotations = annotations
-            except Exception:
-                print("[CAMERA_RUNTIME] annotation loop error:")
-                print(traceback.format_exc())
-            self._stop_event.wait(1.0)
 
 
 _camera_runtime = SharedCameraRuntime()

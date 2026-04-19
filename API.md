@@ -28,7 +28,9 @@ Exemple de reponse:
   "network_camera_profiles": [],
   "multi_camera_cycle_budget_seconds": 2.0,
   "enroll_frames_count": 5,
-  "face_crop_padding_ratio": 0.2
+  "face_crop_padding_ratio": 0.2,
+  "inference_device_preference": "auto",
+  "inference_device_active": "cpu"
 }
 ```
 
@@ -47,6 +49,9 @@ Champs:
 - `multi_camera_cycle_budget_seconds` (`float`, `0.1..10`)
 - `enroll_frames_count` (`int`, `1..30`)
 - `face_crop_padding_ratio` (`float`, `0..1`)
+- `inference_device_preference` (`auto|cpu|cuda`)
+
+`inference_device_active` est retourne par le backend pour indiquer le device reel en cours (`cpu` ou `cuda`).
 
 `NetworkCameraProfile`:
 
@@ -88,7 +93,8 @@ Exemple:
   ],
   "multi_camera_cycle_budget_seconds": 2.0,
   "enroll_frames_count": 5,
-  "face_crop_padding_ratio": 0.2
+  "face_crop_padding_ratio": 0.2,
+  "inference_device_preference": "auto"
 }
 ```
 

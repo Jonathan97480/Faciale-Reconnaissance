@@ -24,6 +24,13 @@ def _mask_profile_secrets(profile: NetworkCameraProfile) -> NetworkCameraProfile
     )
 
 
+def _sanitize_inference_device_preference(value: str | None) -> str:
+    cleaned = str(value or "auto").strip().lower()
+    if cleaned in {"auto", "cpu", "cuda"}:
+        return cleaned
+    return "auto"
+
+
 def read_config(mask_secrets: bool = False) -> ConfigPayload:
     with get_connection() as connection:
         rows = connection.execute("SELECT key, value FROM config").fetchall()
@@ -54,6 +61,17 @@ def read_config(mask_secrets: bool = False) -> ConfigPayload:
     if mask_secrets:
         network_profiles = [_mask_profile_secrets(profile) for profile in network_profiles]
 
+    active_device = "cpu"
+    preference = _sanitize_inference_device_preference(
+        raw_config.get("inference_device_preference", "auto")
+    )
+    try:
+        from app.services.encoder_service import configure_inference_device
+
+        active_device = configure_inference_device(preference)
+    except Exception:
+        active_device = "cpu"
+
     return ConfigPayload(
         detection_interval_seconds=float(raw_config["detection_interval_seconds"]),
         match_threshold=float(raw_config["match_threshold"]),
@@ -66,6 +84,8 @@ def read_config(mask_secrets: bool = False) -> ConfigPayload:
         ),
         enroll_frames_count=int(raw_config.get("enroll_frames_count", "5")),
         face_crop_padding_ratio=float(raw_config.get("face_crop_padding_ratio", "0.2")),
+        inference_device_preference=preference,
+        inference_device_active=active_device,
     )
 
 
@@ -115,6 +135,7 @@ def update_config(payload: ConfigPayload) -> ConfigPayload:
         "multi_camera_cycle_budget_seconds": str(payload.multi_camera_cycle_budget_seconds),
         "enroll_frames_count": str(payload.enroll_frames_count),
         "face_crop_padding_ratio": str(payload.face_crop_padding_ratio),
+        "inference_device_preference": str(payload.inference_device_preference),
     }
 
     with get_connection() as connection:

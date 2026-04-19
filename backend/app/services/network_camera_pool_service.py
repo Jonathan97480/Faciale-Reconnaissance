@@ -1,6 +1,7 @@
 import threading
 import time
 import traceback
+from urllib.parse import urlsplit, urlunsplit
 
 import cv2
 
@@ -77,11 +78,34 @@ class NetworkCameraWorker:
             self._capture.release()
             self._capture = None
 
+    @staticmethod
+    def _strip_query_string(source: str) -> str:
+        parts = urlsplit(source)
+        if not parts.scheme or not parts.netloc or not parts.query:
+            return source
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", parts.fragment))
+
+    @staticmethod
+    def _open_capture(source: str):
+        # Prefer FFmpeg for network URLs; keep default backend as fallback.
+        attempts = [(source, cv2.CAP_FFMPEG), (source, cv2.CAP_ANY)]
+        normalized = NetworkCameraWorker._strip_query_string(source)
+        if normalized != source:
+            attempts.extend([(normalized, cv2.CAP_FFMPEG), (normalized, cv2.CAP_ANY)])
+
+        for attempt_source, backend in attempts:
+            capture = cv2.VideoCapture(attempt_source, backend)
+            if capture is not None and capture.isOpened():
+                return capture
+            if capture is not None:
+                capture.release()
+        return None
+
     def _ensure_capture(self) -> None:
         if self._capture is not None and self._capture.isOpened():
             return
         self._release_capture()
-        self._capture = cv2.VideoCapture(self.source)
+        self._capture = self._open_capture(self.source)
         if self._capture is not None and self._capture.isOpened():
             self._last_connect_at = time.time()
             log_camera_event(self.source, "connect", "Stream connected")
@@ -99,7 +123,7 @@ class NetworkCameraWorker:
                 read_started = time.monotonic()
                 ok, frame = self._capture.read()
                 self._last_read_duration_ms = (time.monotonic() - read_started) * 1000.0
-                if not ok:
+                if not ok or frame is None or frame.size == 0:
                     self._set_error("Capture read failed")
                     self._release_capture()
                     self._stop_event.wait(0.05)

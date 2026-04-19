@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from app.services.config_service import read_config
-from app.services.encoder_service import extract_faces_with_boxes
+from app.services.encoder_service import configure_inference_device, extract_faces_with_boxes
 from app.services.recognition_service import recognize_face
 
 
@@ -65,6 +65,7 @@ def _encode_crop_to_base64(frame, box: tuple[int, int, int, int]) -> str | None:
 def analyze_image_bytes(image_bytes: bytes) -> dict[str, object]:
     frame = _decode_image(image_bytes)
     config = read_config()
+    configure_inference_device(config.inference_device_preference)
 
     height, width = frame.shape[:2]
     face_matches = extract_faces_with_boxes(frame)

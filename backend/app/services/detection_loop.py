@@ -1,13 +1,12 @@
 import threading
 import time
 import traceback
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 from app.services.camera_service import capture_frame
 from app.services.camera_profile_url_service import build_enabled_profile_urls
 from app.services.config_service import read_config
 from app.services.detection_runtime_state import set_source_annotations
-from app.services.encoder_service import extract_faces_with_boxes
+from app.services.encoder_service import configure_inference_device, extract_faces_with_boxes
 from app.services.network_camera_pool_service import (
     collect_network_camera_frames,
     sync_network_camera_sources,
@@ -19,6 +18,7 @@ class DetectionLoop:
     def __init__(self) -> None:
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+        self._source_cursor = 0
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -52,10 +52,18 @@ class DetectionLoop:
             annotations.append((box, label, color))
         return results, annotations
 
+    def _ordered_frame_items(self, frame_items: list[tuple[str, object]]) -> list[tuple[str, object]]:
+        if not frame_items:
+            return []
+        count = len(frame_items)
+        cursor = self._source_cursor % count
+        return frame_items[cursor:] + frame_items[:cursor]
+
     def _run(self) -> None:
         while not self._stop_event.is_set():
             try:
                 config = read_config()
+                configure_inference_device(config.inference_device_preference)
                 profile_urls = build_enabled_profile_urls(config.network_camera_profiles)
                 merged_network_sources = list(config.network_camera_sources)
                 for url in profile_urls:
@@ -71,41 +79,28 @@ class DetectionLoop:
                 if primary_frame is not None:
                     frame_items.append(("local", primary_frame))
                 frame_items.extend(collect_network_camera_frames())
+                ordered_items = self._ordered_frame_items(frame_items)
 
                 cycle_budget_seconds = config.multi_camera_cycle_budget_seconds
                 started_at = time.monotonic()
                 all_results = []
 
-                if frame_items:
-                    max_workers = max(1, min(len(frame_items), 10))
-                    executor = ThreadPoolExecutor(max_workers=max_workers)
+                processed_count = 0
+                for source, frame in ordered_items:
+                    if processed_count > 0 and (time.monotonic() - started_at) >= cycle_budget_seconds:
+                        break
                     try:
-                        futures = {
-                            executor.submit(self._process_frame, frame): source
-                            for source, frame in frame_items
-                        }
-                        while futures:
-                            remaining = cycle_budget_seconds - (time.monotonic() - started_at)
-                            if remaining <= 0:
-                                break
-                            done, pending = wait(
-                                futures,
-                                timeout=remaining,
-                                return_when=FIRST_COMPLETED,
-                            )
-                            for future in done:
-                                source = futures.get(future, "")
-                                try:
-                                    results, annotations = future.result()
-                                    all_results.extend(results)
-                                    if source:
-                                        set_source_annotations(source, annotations)
-                                except Exception:
-                                    print("[DETECTION_LOOP] frame processing error:")
-                                    print(traceback.format_exc())
-                            futures = {future: futures[future] for future in pending}
-                    finally:
-                        executor.shutdown(wait=False, cancel_futures=True)
+                        results, annotations = self._process_frame(frame)
+                        all_results.extend(results)
+                        if source:
+                            set_source_annotations(source, annotations)
+                    except Exception:
+                        print("[DETECTION_LOOP] frame processing error:")
+                        print(traceback.format_exc())
+                    processed_count += 1
+
+                if frame_items:
+                    self._source_cursor = (self._source_cursor + max(1, processed_count)) % len(frame_items)
 
                 save_detection(all_results)
 

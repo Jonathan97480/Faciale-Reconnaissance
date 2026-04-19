@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
 import { apiClient } from "../api/client";
+import { useConfig } from "../context/ConfigContext";
 
 export default function MonitoringPanel() {
+  const { config } = useConfig();
   const [result, setResult] = useState(null);
   const [imageAnalysis, setImageAnalysis] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -10,7 +12,6 @@ export default function MonitoringPanel() {
   const [history, setHistory] = useState([]);
   const [cameraAlerts, setCameraAlerts] = useState([]);
   const [loopState, setLoopState] = useState(null);
-  const [runtimeConfig, setRuntimeConfig] = useState(null);
   const [status, setStatus] = useState("");
   const [cameraStatus, setCameraStatus] = useState("Apercu flux actif.");
   const [feedStatus, setFeedStatus] = useState({});
@@ -55,25 +56,67 @@ export default function MonitoringPanel() {
     }
   };
 
-  const refreshConfig = async () => {
+  const buildConfigPayload = (state) => ({
+    detection_interval_seconds: Number(state?.detection_interval_seconds ?? 3),
+    match_threshold: Number(state?.match_threshold ?? 0.6),
+    camera_index: Number(state?.camera_index ?? 0),
+    camera_source: String(state?.camera_source ?? ""),
+    network_camera_sources: (state?.network_camera_sources ?? [])
+      .map((source) => String(source).trim())
+      .filter((source, index, arr) => source && arr.indexOf(source) === index)
+      .slice(0, 10),
+    network_camera_profiles: (state?.network_camera_profiles ?? [])
+      .map((profile) => ({
+        ...profile,
+        name: String(profile.name ?? "").trim(),
+        host: String(profile.host ?? "").trim(),
+        path: String(profile.path ?? "/"),
+        username: String(profile.username ?? ""),
+        password: String(profile.password ?? ""),
+        onvif_url: String(profile.onvif_url ?? ""),
+        port: Number(profile.port ?? 554),
+        enabled: Boolean(profile.enabled),
+      }))
+      .filter((profile) => profile.name && profile.host)
+      .slice(0, 10),
+    multi_camera_cycle_budget_seconds: Number(state?.multi_camera_cycle_budget_seconds ?? 2),
+    enroll_frames_count: Number(state?.enroll_frames_count ?? 5),
+    face_crop_padding_ratio: Number(state?.face_crop_padding_ratio ?? 0.2),
+    inference_device_preference: String(state?.inference_device_preference ?? "auto"),
+  });
+
+  const removeNetworkFeed = async (sourceToRemove) => {
+    setStatus("Suppression du flux reseau...");
+    console.info("[MonitoringPanel] removeNetworkFeed click", { sourceToRemove });
     try {
-      const response = await apiClient.getConfig();
-      setRuntimeConfig(response);
-    } catch {
-      setStatus("Echec de lecture de la configuration runtime.");
+      const freshConfig = await apiClient.getConfig();
+      console.info("[MonitoringPanel] GET /api/config fresh", freshConfig);
+      const next = {
+        ...freshConfig,
+        network_camera_sources: (freshConfig.network_camera_sources ?? []).filter(
+          (source) => source !== sourceToRemove
+        ),
+      };
+      console.info("[MonitoringPanel] PUT /api/config payload", next);
+      await apiClient.updateConfig(buildConfigPayload(next));
+      const after = await apiClient.getConfig();
+      console.info("[MonitoringPanel] GET /api/config after delete", after);
+      await refreshLoopState();
+      setStatus(`Flux reseau supprime: ${sourceToRemove}`);
+    } catch (err) {
+      console.error("[MonitoringPanel] removeNetworkFeed failed", err);
+      setStatus("Echec suppression flux reseau.");
     }
   };
 
   useEffect(() => {
     refreshLoopState();
-    refreshConfig();
     refreshLatestDetection();
     refreshHistory();
     refreshCameraAlerts();
 
     const timer = setInterval(() => {
       refreshLoopState();
-      refreshConfig();
       refreshLatestDetection();
       refreshHistory();
       refreshCameraAlerts();
@@ -136,9 +179,7 @@ export default function MonitoringPanel() {
   const detectedFaces = latestDetection?.faces ?? [];
   const hasUnknownFace = detectedFaces.some((face) => face.status === "inconnu");
   const networkSources =
-    loopState?.network_cameras?.configured_sources ??
-    runtimeConfig?.network_camera_sources ??
-    [];
+    config?.network_camera_sources ?? [];
   const sourceRuntimeMap = Object.fromEntries(
     (loopState?.network_cameras?.sources ?? []).map((item) => [item.source, item])
   );
@@ -249,7 +290,11 @@ export default function MonitoringPanel() {
         {sideFeeds.length > 0 && (
           <div className="stream-grid">
             {sideFeeds.map((feed) => {
-              const streamIsOk = feedStatus[feed.key] !== false;
+              const runtime = feed.type === "network" ? sourceRuntimeMap[feed.source] : null;
+              const streamIsOk =
+                feed.type === "network"
+                  ? Boolean(runtime?.has_frame) && !runtime?.last_error
+                  : feedStatus[feed.key] !== false;
               const feedUrl =
                 feed.type === "local"
                   ? apiClient.getRecognitionPreviewStreamUrl()
@@ -273,12 +318,31 @@ export default function MonitoringPanel() {
                       {streamIsOk ? "actif" : "indisponible"}
                     </span>
                   </div>
+                  {feed.type === "network" && (
+                    <div className="button-row" style={{ marginTop: 6 }}>
+                      <button
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          removeNetworkFeed(feed.source);
+                        }}
+                      >
+                        Supprimer flux
+                      </button>
+                    </div>
+                  )}
                   <p className="stream-source">{feed.type === "local" ? "camera locale" : feed.source}</p>
-                  {feed.type === "network" && sourceRuntimeMap[feed.source] && (
+                  {feed.type === "network" && runtime && (
                     <p className="stream-source">
-                      {sourceRuntimeMap[feed.source].last_error
-                        ? `Erreur: ${sourceRuntimeMap[feed.source].last_error}`
-                        : `OK | read=${sourceRuntimeMap[feed.source].last_read_duration_ms}ms`}
+                      {runtime.last_error
+                        ? `Erreur: ${runtime.last_error}`
+                        : runtime.has_frame
+                          ? `OK | read=${runtime.last_read_duration_ms}ms`
+                          : "Initialisation flux..."}
                     </p>
                   )}
                   <div className="stream-mini-wrap">
@@ -310,7 +374,6 @@ export default function MonitoringPanel() {
         <button
           onClick={async () => {
             await refreshLoopState();
-            await refreshConfig();
             await refreshLatestDetection();
             await refreshHistory();
             await refreshCameraAlerts();

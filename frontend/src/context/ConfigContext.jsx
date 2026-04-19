@@ -12,7 +12,7 @@ export function ConfigProvider({ children }) {
   useEffect(() => {
     let mounted = true;
     apiClient
-      .getConfig()
+      .getConfig({ silent: true })
       .then((data) => {
         if (mounted) {
           setConfig(data);

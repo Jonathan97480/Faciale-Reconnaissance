@@ -26,6 +26,8 @@ class ConfigPayload(BaseModel):
     multi_camera_cycle_budget_seconds: float = Field(default=2.0, gt=0.1, le=10)
     enroll_frames_count: int = Field(default=5, ge=1, le=30)
     face_crop_padding_ratio: float = Field(default=0.2, ge=0, le=1)
+    inference_device_preference: Literal["auto", "cpu", "cuda"] = "auto"
+    inference_device_active: Literal["cpu", "cuda"] = "cpu"
 
 
 class FaceCreatePayload(BaseModel):

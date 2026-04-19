@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from app.core.schemas import FaceCreatePayload, FaceEnrollPayload, FaceRecord
 from app.services.camera_service import capture_frame
 from app.services.config_service import read_config
-from app.services.encoder_service import extract_averaged_embedding
+from app.services.encoder_service import configure_inference_device, extract_averaged_embedding
 from app.services.face_service import create_face
 
 router = APIRouter(prefix="/faces", tags=["enrollment"])
@@ -19,6 +19,7 @@ def enroll_face(payload: FaceEnrollPayload) -> FaceRecord:
     Using multiple frames produces a more stable reference embedding.
     """
     config = read_config()
+    configure_inference_device(config.inference_device_preference)
     n = config.enroll_frames_count
 
     frames = []

@@ -15,6 +15,8 @@ def test_get_and_update_config(monkeypatch, tmp_path):
         assert initial.json()["network_camera_sources"] == []
         assert initial.json()["network_camera_profiles"] == []
         assert initial.json()["multi_camera_cycle_budget_seconds"] == 2
+        assert initial.json()["inference_device_preference"] == "auto"
+        assert initial.json()["inference_device_active"] in {"cpu", "cuda"}
 
         payload = {
             "detection_interval_seconds": 5,
@@ -41,10 +43,12 @@ def test_get_and_update_config(monkeypatch, tmp_path):
             "multi_camera_cycle_budget_seconds": 2,
             "enroll_frames_count": 8,
             "face_crop_padding_ratio": 0.25,
+            "inference_device_preference": "cpu",
         }
         updated = client.put("/api/config", json=payload)
         assert updated.status_code == 200
         expected = dict(payload)
+        expected["inference_device_active"] = "cpu"
         expected["network_camera_profiles"] = [
             {
                 **payload["network_camera_profiles"][0],

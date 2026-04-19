@@ -3,8 +3,14 @@ uvicorn[standard]==0.35.0
 pydantic==2.11.7
 pytest==8.4.1
 httpx==0.28.1
+# Runtime compat for facenet-pytorch 2.6.x
+numpy<2.0
 # Webcam capture
-opencv-python>=4.8.0
+opencv-python==4.10.0.84
 # Face encoding — pre-built wheel, no compilation needed
 facenet-pytorch>=2.5.3
-Pillow>=10.0.0
+Pillow>=10.2.0,<10.3.0
+# Default (CPU) torch stack. For NVIDIA GPU, install CUDA wheels from README.
+torch==2.2.2
+torchvision==0.17.2
+torchaudio==2.2.2

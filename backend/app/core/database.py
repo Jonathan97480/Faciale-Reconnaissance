@@ -12,6 +12,7 @@ DEFAULT_CONFIG = {
     "multi_camera_cycle_budget_seconds": "2",
     "enroll_frames_count": "5",
     "face_crop_padding_ratio": "0.2",
+    "inference_device_preference": "auto",
 }
 
 

@@ -1,16 +1,41 @@
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 
-async function request(path, options = {}) {
+async function request(path, options = {}, meta = {}) {
+    const method = options.method || "GET";
+    const shouldLogConfig = path === "/config" && !meta.silent;
+    if (shouldLogConfig) {
+        console.info("[apiClient] request", { method, path, body: options.body || null });
+    }
     const response = await fetch(`${apiBaseUrl}${path}`, {
         headers: { "Content-Type": "application/json" },
         ...options,
     });
 
     if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        let detail = "";
+        try {
+            const payload = await response.json();
+            detail = payload?.detail ? ` - ${payload.detail}` : "";
+        } catch {
+            try {
+                const text = await response.text();
+                detail = text ? ` - ${text}` : "";
+            } catch {
+                detail = "";
+            }
+        }
+        const message = `API error: ${response.status}${detail}`;
+        if (shouldLogConfig) {
+            console.error("[apiClient] request failed", { method, path, message });
+        }
+        throw new Error(message);
     }
 
-    return response.json();
+    const payload = await response.json();
+    if (shouldLogConfig) {
+        console.info("[apiClient] response", { method, path, payload });
+    }
+    return payload;
 }
 
 function arrayBufferToBase64(arrayBuffer) {
@@ -23,7 +48,7 @@ function arrayBufferToBase64(arrayBuffer) {
 }
 
 export const apiClient = {
-    getConfig: () => request("/config"),
+    getConfig: (meta = {}) => request("/config", {}, meta),
     updateConfig: (payload) =>
         request("/config", { method: "PUT", body: JSON.stringify(payload) }),
     listFaces: () => request("/faces"),

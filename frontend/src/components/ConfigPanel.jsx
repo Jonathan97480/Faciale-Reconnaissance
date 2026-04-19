@@ -29,6 +29,56 @@ export default function ConfigPanel() {
 
   const draft = local || config;
 
+  const toPayload = (state) => {
+    const sanitizedNetworkSources = (state.network_camera_sources ?? [])
+      .map((source) => String(source).trim())
+      .filter((source, index, arr) => source && arr.indexOf(source) === index)
+      .slice(0, 10);
+    const sanitizedProfiles = (state.network_camera_profiles ?? [])
+      .map((profile) => ({
+        ...profile,
+        name: String(profile.name ?? "").trim(),
+        host: String(profile.host ?? "").trim(),
+        path: String(profile.path ?? "/"),
+        username: String(profile.username ?? ""),
+        password: String(profile.password ?? ""),
+        onvif_url: String(profile.onvif_url ?? ""),
+        port: Number(profile.port ?? 554),
+        enabled: Boolean(profile.enabled),
+      }))
+      .filter((profile) => profile.name && profile.host)
+      .slice(0, 10);
+    return {
+      detection_interval_seconds: Number(state.detection_interval_seconds),
+      match_threshold: Number(state.match_threshold),
+      camera_index: Number(state.camera_index),
+      camera_source: state.camera_source ?? "",
+      network_camera_sources: sanitizedNetworkSources,
+      network_camera_profiles: sanitizedProfiles,
+      multi_camera_cycle_budget_seconds: Number(state.multi_camera_cycle_budget_seconds),
+      enroll_frames_count: Number(state.enroll_frames_count),
+      face_crop_padding_ratio: Number(state.face_crop_padding_ratio),
+      inference_device_preference: String(state.inference_device_preference ?? "auto"),
+    };
+  };
+
+  const persistConfig = async (state, successMessage) => {
+    setStatus("Sauvegarde...");
+    const payload = toPayload(state);
+    console.info("[ConfigPanel] PUT /api/config payload", payload);
+    try {
+      const saved = await saveConfig(payload);
+      console.info("[ConfigPanel] PUT /api/config response", saved);
+      setLocal(null);
+      setStatus(successMessage);
+      return true;
+    } catch (err) {
+      console.error("[ConfigPanel] PUT /api/config failed", err);
+      setStatus("Echec de sauvegarde.");
+      return false;
+    }
+  };
+
   const onChange = (field, value) => {
     setLocal({ ...draft, [field]: value });
   };
@@ -39,51 +89,17 @@ export default function ConfigPanel() {
   };
 
   const onSave = async () => {
-    setStatus("Sauvegarde...");
-    try {
-      const sanitizedNetworkSources = (draft.network_camera_sources ?? [])
-        .map((source) => String(source).trim())
-        .filter((source, index, arr) => source && arr.indexOf(source) === index)
-        .slice(0, 10);
-      const sanitizedProfiles = (draft.network_camera_profiles ?? [])
-        .map((profile) => ({
-          ...profile,
-          name: String(profile.name ?? "").trim(),
-          host: String(profile.host ?? "").trim(),
-          path: String(profile.path ?? "/"),
-          username: String(profile.username ?? ""),
-          password: String(profile.password ?? ""),
-          onvif_url: String(profile.onvif_url ?? ""),
-          port: Number(profile.port ?? 554),
-          enabled: Boolean(profile.enabled),
-        }))
-        .filter((profile) => profile.name && profile.host)
-        .slice(0, 10);
-
-      await saveConfig({
-        detection_interval_seconds: Number(draft.detection_interval_seconds),
-        match_threshold: Number(draft.match_threshold),
-        camera_index: Number(draft.camera_index),
-        camera_source: draft.camera_source ?? "",
-        network_camera_sources: sanitizedNetworkSources,
-        network_camera_profiles: sanitizedProfiles,
-        multi_camera_cycle_budget_seconds: Number(draft.multi_camera_cycle_budget_seconds),
-        enroll_frames_count: Number(draft.enroll_frames_count),
-        face_crop_padding_ratio: Number(draft.face_crop_padding_ratio),
-      });
-      setLocal(null);
-      setStatus("Configuration sauvegardee.");
-    } catch {
-      setStatus("Echec de sauvegarde.");
-    }
+    await persistConfig(draft, "Configuration sauvegardee.");
   };
 
-  const addNetworkSource = () => {
+  const addNetworkSource = async () => {
     const cleaned = newNetworkSource.trim();
     if (!cleaned) {
       return;
     }
-    const current = draft.network_camera_sources ?? [];
+    console.info("[ConfigPanel] addNetworkSource click", { cleaned });
+    const base = config ?? draft;
+    const current = base?.network_camera_sources ?? [];
     if (current.includes(cleaned)) {
       setStatus("Ce flux est deja ajoute.");
       return;
@@ -92,21 +108,30 @@ export default function ConfigPanel() {
       setStatus("Maximum 10 flux reseau.");
       return;
     }
-    onChange("network_camera_sources", [...current, cleaned]);
+    const nextDraft = { ...base, network_camera_sources: [...current, cleaned] };
+    setLocal(nextDraft);
+    const saved = await persistConfig(nextDraft, "Flux reseau ajoute.");
+    if (!saved) {
+      return;
+    }
     setNewNetworkSource("");
-    setStatus("");
   };
 
-  const removeNetworkSource = (sourceToRemove) => {
-    const current = draft.network_camera_sources ?? [];
-    onChange(
-      "network_camera_sources",
-      current.filter((source) => source !== sourceToRemove)
-    );
-    setStatus("");
+  const removeNetworkSource = async (sourceToRemove) => {
+    console.info("[ConfigPanel] removeNetworkSource click", { sourceToRemove });
+    const base = config ?? draft;
+    const current = base?.network_camera_sources ?? [];
+    console.info("[ConfigPanel] removeNetworkSource current list", current);
+    const nextDraft = {
+      ...base,
+      network_camera_sources: current.filter((source) => source !== sourceToRemove),
+    };
+    console.info("[ConfigPanel] removeNetworkSource next list", nextDraft.network_camera_sources);
+    setLocal(nextDraft);
+    await persistConfig(nextDraft, `Flux reseau supprime: ${sourceToRemove}`);
   };
 
-  const addCameraProfile = () => {
+  const addCameraProfile = async () => {
     const profile = {
       ...newCameraProfile,
       name: String(newCameraProfile.name).trim(),
@@ -118,12 +143,19 @@ export default function ConfigPanel() {
       setStatus("Nom et host requis pour le profil camera.");
       return;
     }
-    const current = draft.network_camera_profiles ?? [];
+    console.info("[ConfigPanel] addCameraProfile click", profile);
+    const base = config ?? draft;
+    const current = base?.network_camera_profiles ?? [];
     if (current.length >= 10) {
       setStatus("Maximum 10 profils camera.");
       return;
     }
-    onChange("network_camera_profiles", [...current, profile]);
+    const nextDraft = { ...base, network_camera_profiles: [...current, profile] };
+    setLocal(nextDraft);
+    const saved = await persistConfig(nextDraft, "Profil camera ajoute.");
+    if (!saved) {
+      return;
+    }
     setNewCameraProfile({
       name: "",
       protocol: "rtsp",
@@ -135,16 +167,18 @@ export default function ConfigPanel() {
       onvif_url: "",
       enabled: true,
     });
-    setStatus("");
   };
 
-  const removeCameraProfile = (indexToRemove) => {
-    const current = draft.network_camera_profiles ?? [];
-    onChange(
-      "network_camera_profiles",
-      current.filter((_, index) => index !== indexToRemove)
-    );
-    setStatus("");
+  const removeCameraProfile = async (indexToRemove) => {
+    console.info("[ConfigPanel] removeCameraProfile click", { indexToRemove });
+    const base = config ?? draft;
+    const current = base?.network_camera_profiles ?? [];
+    const nextDraft = {
+      ...base,
+      network_camera_profiles: current.filter((_, index) => index !== indexToRemove),
+    };
+    setLocal(nextDraft);
+    await persistConfig(nextDraft, "Profil camera supprime.");
   };
 
   return (
@@ -225,7 +259,21 @@ export default function ConfigPanel() {
             onChange={(event) => onChange("face_crop_padding_ratio", event.target.value)}
           />
         </label>
+        <label>
+          Acceleration IA (GPU)
+          <select
+            value={draft.inference_device_preference ?? "auto"}
+            onChange={(event) => onChange("inference_device_preference", event.target.value)}
+          >
+            <option value="auto">Auto (GPU si disponible)</option>
+            <option value="cuda">Forcer GPU (CUDA)</option>
+            <option value="cpu">Forcer CPU</option>
+          </select>
+        </label>
       </div>
+      <p className="status-line">
+        Appareil IA actif: <strong>{draft.inference_device_active ?? "cpu"}</strong>
+      </p>
       <div className="panel" style={{ marginTop: 10 }}>
         <h3>Flux caméras réseau (max 10)</h3>
         <div className="button-row">

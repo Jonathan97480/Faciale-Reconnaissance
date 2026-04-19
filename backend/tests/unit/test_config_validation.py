@@ -63,3 +63,13 @@ def test_rejects_more_than_ten_network_camera_profiles():
                 for idx in range(11)
             ],
         )
+
+
+def test_rejects_invalid_inference_device_preference():
+    with pytest.raises(ValidationError):
+        ConfigPayload(
+            detection_interval_seconds=3,
+            match_threshold=0.7,
+            camera_index=0,
+            inference_device_preference="metal",
+        )
