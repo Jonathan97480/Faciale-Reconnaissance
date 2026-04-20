@@ -68,6 +68,11 @@ bash install-linux.sh
 cd backend
 pip install -r requirements.txt
 ```
+- Backend dev/tests:
+```bash
+cd backend
+pip install -r requirements-dev.txt
+```
 - Option GPU NVIDIA (CUDA, recommande pour perf):
 ```bash
 cd backend
@@ -133,7 +138,8 @@ Notes:
 - la webcam locale reste utilisable en parallele des flux reseau
 - les mots de passe des profils sont masques dans `GET /api/config`
 - en mode `auto`, le backend utilise le GPU CUDA si disponible, sinon CPU
-- `requirements.txt` installe une pile CPU par defaut; pour CUDA, utiliser la commande GPU ci-dessus
+- `requirements.txt` installe la pile runtime CPU par defaut; pour CUDA, utiliser la commande GPU ci-dessus
+- `requirements-dev.txt` ajoute les dependances de test et de developpement
 
 ## Endpoints camera supplementaires
 
@@ -149,6 +155,7 @@ Notes:
 - Backend:
 ```bash
 cd backend
+pip install -r requirements-dev.txt
 pytest
 ```
 - Frontend build:

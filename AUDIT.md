@@ -176,9 +176,15 @@ Realise:
 - Parametres exposes dans la configuration backend/frontend
 - Reponse `429` avec header `Retry-After`
 
-17. `[a faire]` Separer `requirements.txt` et `requirements-dev.txt`
+17. `[fait]` Separer `requirements.txt` et `requirements-dev.txt`
 Fichier:
 - `backend/requirements.txt`
+- `backend/requirements-dev.txt`
+
+Realise:
+- `requirements.txt` conserve les dependances runtime
+- `requirements-dev.txt` ajoute les dependances de test/developpement
+- Scripts d'installation et README aligns sur cette separation
 
 ### Priorite 3 - Confort / Scaling
 
@@ -228,6 +234,7 @@ Ce qui est effectivement termine a ce stade:
 - Refactor du `MonitoringPanel` en sous-composants
 - Refactor du `ConfigPanel` en sections et helpers
 - Rate limiting configurable sur l'API production
+- Separation des dependances runtime et dev
 - Non exposition des embeddings via API
 - Suppression du rendu HTML brut pour les infos visage
 - Harmonisation du client API frontend
@@ -236,7 +243,7 @@ Ce qui est effectivement termine a ce stade:
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Separer `requirements.txt` et `requirements-dev.txt`
-2. Renommer/assainir `autres_infos_html` cote backend
-3. Separer biometrie et identite en 2 tables
-4. Ajouter cache config
+1. Renommer/assainir `autres_infos_html` cote backend
+2. Separer biometrie et identite en 2 tables
+3. Ajouter cache config
+4. Ameliorer README securite + prod
