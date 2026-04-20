@@ -10,8 +10,15 @@ from app.services.detection_runtime_state import get_source_annotations_updated_
 
 
 class NetworkCameraWorker:
-    def __init__(self, source: str) -> None:
+    def __init__(
+        self,
+        source: str,
+        retry_base_seconds: float = 0.5,
+        retry_max_seconds: float = 8.0,
+    ) -> None:
         self.source = source
+        self._retry_base_seconds = retry_base_seconds
+        self._retry_max_seconds = retry_max_seconds
         self._frame_lock = threading.Lock()
         self._control_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -23,6 +30,8 @@ class NetworkCameraWorker:
         self._consecutive_failures = 0
         self._last_read_duration_ms = 0.0
         self._last_connect_at: float | None = None
+        self._next_retry_at: float | None = None
+        self._current_retry_delay_seconds = 0.0
 
     def start(self) -> None:
         with self._control_lock:
@@ -59,6 +68,8 @@ class NetworkCameraWorker:
             "consecutive_failures": self._consecutive_failures,
             "last_read_duration_ms": round(self._last_read_duration_ms, 2),
             "last_connect_at": self._last_connect_at,
+            "next_retry_at": self._next_retry_at,
+            "retry_delay_seconds": round(self._current_retry_delay_seconds, 3),
         }
 
     def _set_error(self, message: str) -> None:
@@ -72,6 +83,12 @@ class NetworkCameraWorker:
     def _set_success(self) -> None:
         self._last_error = None
         self._consecutive_failures = 0
+        self._next_retry_at = None
+        self._current_retry_delay_seconds = 0.0
+
+    def update_backoff(self, retry_base_seconds: float, retry_max_seconds: float) -> None:
+        self._retry_base_seconds = retry_base_seconds
+        self._retry_max_seconds = max(retry_max_seconds, retry_base_seconds)
 
     def _release_capture(self) -> None:
         if self._capture is not None:
@@ -104,13 +121,29 @@ class NetworkCameraWorker:
     def _ensure_capture(self) -> None:
         if self._capture is not None and self._capture.isOpened():
             return
+        if self._next_retry_at is not None:
+            remaining = self._next_retry_at - time.time()
+            if remaining > 0:
+                self._stop_event.wait(min(0.2, remaining))
+                return
         self._release_capture()
         self._capture = self._open_capture(self.source)
         if self._capture is not None and self._capture.isOpened():
             self._last_connect_at = time.time()
+            self._set_success()
             log_camera_event(self.source, "connect", "Stream connected")
         else:
             self._set_error("Cannot open stream")
+            self._schedule_retry()
+
+    def _schedule_retry(self) -> None:
+        exponent = max(0, self._consecutive_failures - 1)
+        delay = min(
+            self._retry_max_seconds,
+            self._retry_base_seconds * (2**exponent),
+        )
+        self._current_retry_delay_seconds = delay
+        self._next_retry_at = time.time() + delay
 
     def _run(self) -> None:
         while not self._stop_event.is_set():
@@ -126,7 +159,7 @@ class NetworkCameraWorker:
                 if not ok or frame is None or frame.size == 0:
                     self._set_error("Capture read failed")
                     self._release_capture()
-                    self._stop_event.wait(0.05)
+                    self._schedule_retry()
                     continue
 
                 with self._frame_lock:
@@ -136,6 +169,7 @@ class NetworkCameraWorker:
                 self._stop_event.wait(0.03)
             except Exception:
                 self._set_error("Worker exception")
+                self._schedule_retry()
                 print(f"[NETWORK_CAMERA_WORKER] source={self.source} error:")
                 print(traceback.format_exc())
                 self._stop_event.wait(0.2)
@@ -148,7 +182,13 @@ class NetworkCameraPool:
         self._lock = threading.Lock()
         self._workers: dict[str, NetworkCameraWorker] = {}
 
-    def sync_sources(self, sources: list[str], max_sources: int = 10) -> None:
+    def sync_sources(
+        self,
+        sources: list[str],
+        max_sources: int = 10,
+        retry_base_seconds: float = 0.5,
+        retry_max_seconds: float = 8.0,
+    ) -> None:
         unique_sources: list[str] = []
         for source in sources:
             cleaned = source.strip()
@@ -167,8 +207,16 @@ class NetworkCameraPool:
 
             for source in unique_sources:
                 if source in self._workers:
+                    self._workers[source].update_backoff(
+                        retry_base_seconds=retry_base_seconds,
+                        retry_max_seconds=retry_max_seconds,
+                    )
                     continue
-                worker = NetworkCameraWorker(source)
+                worker = NetworkCameraWorker(
+                    source,
+                    retry_base_seconds=retry_base_seconds,
+                    retry_max_seconds=retry_max_seconds,
+                )
                 worker.start()
                 self._workers[source] = worker
                 log_camera_event(source, "start", "Source added to runtime")
@@ -215,8 +263,18 @@ class NetworkCameraPool:
 network_camera_pool = NetworkCameraPool()
 
 
-def sync_network_camera_sources(sources: list[str], max_sources: int = 10) -> None:
-    network_camera_pool.sync_sources(sources, max_sources=max_sources)
+def sync_network_camera_sources(
+    sources: list[str],
+    max_sources: int = 10,
+    retry_base_seconds: float = 0.5,
+    retry_max_seconds: float = 8.0,
+) -> None:
+    network_camera_pool.sync_sources(
+        sources,
+        max_sources=max_sources,
+        retry_base_seconds=retry_base_seconds,
+        retry_max_seconds=retry_max_seconds,
+    )
 
 
 def collect_network_camera_frames() -> list[tuple[str, object]]:

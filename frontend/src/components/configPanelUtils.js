@@ -44,6 +44,12 @@ export function toConfigPayload(state) {
     multi_camera_cycle_budget_seconds: Number(
       state.multi_camera_cycle_budget_seconds
     ),
+    network_camera_retry_base_seconds: Number(
+      state.network_camera_retry_base_seconds ?? 0.5
+    ),
+    network_camera_retry_max_seconds: Number(
+      state.network_camera_retry_max_seconds ?? 8
+    ),
     enroll_frames_count: Number(state.enroll_frames_count),
     face_crop_padding_ratio: Number(state.face_crop_padding_ratio),
     inference_device_preference: String(

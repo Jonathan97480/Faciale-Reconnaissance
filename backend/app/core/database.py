@@ -11,6 +11,8 @@ DEFAULT_CONFIG = {
     "network_camera_sources_json": "[]",
     "network_camera_profiles_json": "[]",
     "multi_camera_cycle_budget_seconds": "2",
+    "network_camera_retry_base_seconds": "0.5",
+    "network_camera_retry_max_seconds": "8",
     "enroll_frames_count": "5",
     "face_crop_padding_ratio": "0.2",
     "inference_device_preference": "auto",

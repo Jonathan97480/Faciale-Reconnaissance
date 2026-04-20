@@ -109,6 +109,8 @@ class DetectionLoop:
                 sync_network_camera_sources(
                     merged_network_sources,
                     max_sources=10,
+                    retry_base_seconds=config.network_camera_retry_base_seconds,
+                    retry_max_seconds=config.network_camera_retry_max_seconds,
                 )
 
                 capture_started_at = time.monotonic()

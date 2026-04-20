@@ -2,6 +2,7 @@ import { apiClient } from "../api/client";
 
 export default function MonitoringFeedGrid({
   feedStatus,
+  localRuntime,
   removeNetworkFeed,
   setFeedStatus,
   setMainFeedKey,
@@ -16,9 +17,9 @@ export default function MonitoringFeedGrid({
     <div className="stream-grid">
       {sideFeeds.map((feed) => {
         const runtime =
-          feed.type === "network" ? sourceRuntimeMap[feed.source] : null;
+          feed.type === "local" ? localRuntime : sourceRuntimeMap[feed.source];
         const streamIsOk =
-          feed.type === "network"
+          runtime != null
             ? Boolean(runtime?.has_frame) && !runtime?.last_error
             : feedStatus[feed.key] !== false;
         const feedUrl =
@@ -65,7 +66,7 @@ export default function MonitoringFeedGrid({
             <p className="stream-source">
               {feed.type === "local" ? "camera locale" : feed.source}
             </p>
-            {feed.type === "network" && runtime && (
+            {runtime && (
               <p className="stream-source">
                 {runtime.last_error
                   ? `Erreur: ${runtime.last_error}`

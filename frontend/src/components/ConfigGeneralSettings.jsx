@@ -74,6 +74,32 @@ export default function ConfigGeneralSettings({ draft, onChange }) {
           />
         </label>
         <label>
+          Retry base flux reseau (secondes)
+          <input
+            type="number"
+            min="0.1"
+            max="30"
+            step="0.1"
+            value={draft.network_camera_retry_base_seconds ?? 0.5}
+            onChange={(event) =>
+              onChange("network_camera_retry_base_seconds", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          Retry max flux reseau (secondes)
+          <input
+            type="number"
+            min="0.2"
+            max="120"
+            step="0.1"
+            value={draft.network_camera_retry_max_seconds ?? 8}
+            onChange={(event) =>
+              onChange("network_camera_retry_max_seconds", event.target.value)
+            }
+          />
+        </label>
+        <label>
           Nombre de frames d&apos;enrolement
           <input
             type="number"

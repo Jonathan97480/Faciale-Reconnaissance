@@ -181,6 +181,8 @@ Champs principaux:
 - `network_camera_sources` (liste, max 10)
 - `network_camera_profiles` (liste, max 10)
 - `multi_camera_cycle_budget_seconds` (defaut: `2.0`)
+- `network_camera_retry_base_seconds` (defaut: `0.5`)
+- `network_camera_retry_max_seconds` (defaut: `8.0`)
 - `enroll_frames_count`
 - `face_crop_padding_ratio`
 - `inference_device_preference` (`auto|cpu|cuda`)
@@ -193,6 +195,9 @@ Notes:
 - `network_camera_sources` sert aux flux reseau supplementaires
 - `network_camera_profiles` permet de declarer des cameras par norme/protocole
 - la webcam locale reste utilisable en parallele des flux reseau
+- les flux reseau utilisent un backoff progressif configurable en cas d'echec de connexion/lecture
+- `network_camera_retry_base_seconds` controle la premiere attente avant retry
+- `network_camera_retry_max_seconds` borne le delai maximum entre tentatives
 - les mots de passe des profils sont masques dans `GET /api/config`
 - en mode `auto`, le backend utilise le GPU CUDA si disponible, sinon CPU
 - `requirements.txt` installe la pile runtime CPU par defaut; pour CUDA, utiliser la commande GPU ci-dessus
@@ -207,6 +212,11 @@ Notes:
   - logs des erreurs/connexions flux camera
 - `GET /api/cameras/profiles/resolved`
   - profils resolus en URLs (version sans credentials)
+
+Notes monitoring reseau:
+
+- les stats runtime exposent l'etat de chaque flux, y compris `last_error`, `consecutive_failures`, `retry_delay_seconds` et `next_retry_at`
+- la camera locale et les flux reseau suivent maintenant un contrat runtime proche dans le monitoring
 
 ## Production et securite
 

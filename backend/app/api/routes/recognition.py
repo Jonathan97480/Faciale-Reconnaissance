@@ -18,6 +18,7 @@ from app.core.schemas import (
 from app.services.camera_service import (
     capture_preview_jpeg,
     current_capture_settings,
+    current_camera_runtime_status,
     stream_preview_frames,
 )
 from app.services.camera_alert_service import build_camera_alerts
@@ -72,6 +73,7 @@ def _build_monitoring_snapshot() -> dict[str, object]:
     return {
         "loop": detection_loop.status(),
         "capture_settings": current_capture_settings(),
+        "local_camera": current_camera_runtime_status(),
         "network_cameras": network_cameras,
         "latest_detection": get_latest_detection(),
         "history": get_detection_history(10),
@@ -84,6 +86,7 @@ def get_loop_status() -> dict[str, object]:
     return {
         "loop": detection_loop.status(),
         "capture_settings": current_capture_settings(),
+        "local_camera": current_camera_runtime_status(),
         "network_cameras": network_camera_pool_status(),
     }
 

@@ -96,6 +96,12 @@ def _load_config_from_db(connection) -> ConfigPayload:
         multi_camera_cycle_budget_seconds=float(
             raw_config.get("multi_camera_cycle_budget_seconds", "2")
         ),
+        network_camera_retry_base_seconds=float(
+            raw_config.get("network_camera_retry_base_seconds", "0.5")
+        ),
+        network_camera_retry_max_seconds=float(
+            raw_config.get("network_camera_retry_max_seconds", "8")
+        ),
         enroll_frames_count=int(raw_config.get("enroll_frames_count", "5")),
         face_crop_padding_ratio=float(raw_config.get("face_crop_padding_ratio", "0.2")),
         inference_device_preference=preference,
@@ -187,6 +193,8 @@ def update_config(payload: ConfigPayload) -> ConfigPayload:
             ]
         ),
         "multi_camera_cycle_budget_seconds": str(payload.multi_camera_cycle_budget_seconds),
+        "network_camera_retry_base_seconds": str(payload.network_camera_retry_base_seconds),
+        "network_camera_retry_max_seconds": str(payload.network_camera_retry_max_seconds),
         "enroll_frames_count": str(payload.enroll_frames_count),
         "face_crop_padding_ratio": str(payload.face_crop_padding_ratio),
         "inference_device_preference": str(payload.inference_device_preference),

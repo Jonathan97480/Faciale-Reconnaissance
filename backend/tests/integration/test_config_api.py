@@ -18,6 +18,8 @@ def test_get_and_update_config(monkeypatch, tmp_path):
         assert initial.json()["network_camera_sources"] == []
         assert initial.json()["network_camera_profiles"] == []
         assert initial.json()["multi_camera_cycle_budget_seconds"] == 2
+        assert initial.json()["network_camera_retry_base_seconds"] == 0.5
+        assert initial.json()["network_camera_retry_max_seconds"] == 8
         assert initial.json()["inference_device_preference"] == "auto"
         assert initial.json()["inference_device_active"] in {"cpu", "cuda"}
         assert initial.json()["match_margin_threshold"] == 0.03
@@ -48,6 +50,8 @@ def test_get_and_update_config(monkeypatch, tmp_path):
                 }
             ],
             "multi_camera_cycle_budget_seconds": 2,
+            "network_camera_retry_base_seconds": 1.5,
+            "network_camera_retry_max_seconds": 12,
             "enroll_frames_count": 8,
             "face_crop_padding_ratio": 0.25,
             "inference_device_preference": "cpu",

@@ -7,6 +7,7 @@ import traceback
 import cv2
 
 from app.services.detection_runtime_state import get_source_annotations
+from app.services.detection_runtime_state import get_source_annotations_updated_at
 from app.services.config_service import read_config
 
 def _open_capture(camera_index: int = 0, camera_source: str = ""):
@@ -35,6 +36,11 @@ class SharedCameraRuntime:
         self._camera_source: str | None = None
         self._latest_frame = None
         self._latest_jpeg: bytes | None = None
+        self._latest_frame_at: float | None = None
+        self._last_error: str | None = None
+        self._consecutive_failures = 0
+        self._last_read_duration_ms = 0.0
+        self._last_connect_at: float | None = None
 
     def start(self) -> None:
         with self._control_lock:
@@ -64,6 +70,34 @@ class SharedCameraRuntime:
         with self._frame_lock:
             return self._latest_jpeg
 
+    def stats(self) -> dict[str, object]:
+        with self._frame_lock:
+            latest_frame_at = self._latest_frame_at
+        return {
+            "source": "local",
+            "is_running": bool(self._thread and self._thread.is_alive()),
+            "has_frame": latest_frame_at is not None,
+            "latest_frame_at": latest_frame_at,
+            "last_detection_at": get_source_annotations_updated_at("local"),
+            "last_error": self._last_error,
+            "consecutive_failures": self._consecutive_failures,
+            "last_read_duration_ms": round(self._last_read_duration_ms, 2),
+            "last_connect_at": self._last_connect_at,
+            "camera_index": self._camera_index,
+            "camera_source": self._camera_source or "",
+        }
+
+    def _set_error(self, message: str) -> None:
+        if message == self._last_error:
+            self._consecutive_failures += 1
+            return
+        self._last_error = message
+        self._consecutive_failures += 1
+
+    def _set_success(self) -> None:
+        self._last_error = None
+        self._consecutive_failures = 0
+
     def _release_capture(self) -> None:
         if self._capture is not None:
             self._capture.release()
@@ -85,6 +119,11 @@ class SharedCameraRuntime:
         self._camera_index = configured_index
         self._camera_source = configured_source
         self._capture = _open_capture(configured_index, configured_source)
+        if self._capture is not None and self._capture.isOpened():
+            self._last_connect_at = time.time()
+            self._set_success()
+        else:
+            self._set_error("Cannot open local camera")
 
     def _run(self) -> None:
         while not self._stop_event.is_set():
@@ -92,11 +131,17 @@ class SharedCameraRuntime:
                 self._switch_camera_if_needed()
 
                 if self._capture is None or not self._capture.isOpened():
+                    self._set_error("Local camera unavailable")
                     self._stop_event.wait(0.2)
                     continue
 
+                read_started = time.monotonic()
                 ret, frame = self._capture.read()
+                self._last_read_duration_ms = (
+                    time.monotonic() - read_started
+                ) * 1000.0
                 if not ret:
+                    self._set_error("Local camera read failed")
                     self._stop_event.wait(0.05)
                     continue
 
@@ -118,10 +163,13 @@ class SharedCameraRuntime:
                 with self._frame_lock:
                     self._latest_frame = frame
                     self._latest_jpeg = encoded.tobytes()
+                    self._latest_frame_at = time.time()
+                self._set_success()
 
                 # ~30 FPS preview target.
                 self._stop_event.wait(0.03)
             except Exception:
+                self._set_error("Local camera worker exception")
                 print("[CAMERA_RUNTIME] capture loop error:")
                 print(traceback.format_exc())
                 self._stop_event.wait(0.2)
@@ -142,7 +190,12 @@ def current_capture_settings() -> dict[str, float | int]:
     return {
         "detection_interval_seconds": config.detection_interval_seconds,
         "camera_index": config.camera_index,
+        "camera_source": config.camera_source,
     }
+
+
+def current_camera_runtime_status() -> dict[str, object]:
+    return _camera_runtime.stats()
 
 
 def capture_preview_jpeg() -> bytes | None:

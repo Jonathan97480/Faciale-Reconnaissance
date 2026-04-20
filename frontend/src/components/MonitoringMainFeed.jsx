@@ -3,6 +3,7 @@ export default function MonitoringMainFeed({
   detectedFaces,
   hasUnknownFace,
   isFullscreen,
+  mainFeedRuntime,
   loopRunning,
   mainFeedUrl,
   setAudioEnabled,
@@ -65,6 +66,14 @@ export default function MonitoringMainFeed({
           <span>FACES: {detectedFaces.length}</span>
           <span>LOOP: {loopRunning ? "RUNNING" : "STOPPED"}</span>
           <span>UNKNOWN: {hasUnknownFace ? "YES" : "NO"}</span>
+          <span>
+            FEED:{" "}
+            {mainFeedRuntime?.last_error
+              ? "ERROR"
+              : mainFeedRuntime?.has_frame
+                ? "LIVE"
+                : "WAIT"}
+          </span>
         </div>
       </div>
     </div>

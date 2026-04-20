@@ -140,6 +140,7 @@ export default function MonitoringPanel() {
           setLoopState({
             loop: payload.loop ?? null,
             capture_settings: payload.capture_settings ?? null,
+            local_camera: payload.local_camera ?? null,
             network_cameras: payload.network_cameras ?? null,
           });
           setLatestDetection(payload.latest_detection ?? null);
@@ -237,6 +238,7 @@ export default function MonitoringPanel() {
       item,
     ])
   );
+  const localRuntime = loopState?.local_camera ?? null;
   const allFeeds = useMemo(
     () => [
       { key: "local", label: "Camera locale", type: "local", source: "" },
@@ -252,6 +254,10 @@ export default function MonitoringPanel() {
   const currentMainFeed =
     allFeeds.find((feed) => feed.key === mainFeedKey) || allFeeds[0];
   const sideFeeds = allFeeds.filter((feed) => feed.key !== currentMainFeed.key);
+  const mainFeedRuntime =
+    currentMainFeed.type === "local"
+      ? localRuntime
+      : sourceRuntimeMap[currentMainFeed.source] ?? null;
 
   useEffect(() => {
     if (!allFeeds.some((feed) => feed.key === mainFeedKey)) {
@@ -286,6 +292,7 @@ export default function MonitoringPanel() {
         detectedFaces={detectedFaces}
         hasUnknownFace={hasUnknownFace}
         isFullscreen={isFullscreen}
+        mainFeedRuntime={mainFeedRuntime}
         loopRunning={loopState?.loop?.running}
         mainFeedUrl={mainFeedUrl}
         setAudioEnabled={setAudioEnabled}
@@ -324,6 +331,7 @@ export default function MonitoringPanel() {
       <MonitoringHistoryPanel title="Grille des flux configures">
         <MonitoringFeedGrid
           feedStatus={feedStatus}
+          localRuntime={localRuntime}
           removeNetworkFeed={removeNetworkFeed}
           setFeedStatus={setFeedStatus}
           setMainFeedKey={setMainFeedKey}

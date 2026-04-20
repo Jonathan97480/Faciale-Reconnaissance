@@ -236,13 +236,29 @@ Realise:
 - Parametre expose dans l'API, persiste en base et editable depuis l'UI
 - Tests ajoutes sur l'ambiguite entre meilleur et second match
 
-22. `[a faire]` Ajouter backoff camera reseau
-Fichier:
+22. `[fait]` Ajouter backoff camera reseau
+Fichiers:
 - `backend/app/services/network_camera_pool_service.py`
+- `backend/app/services/config_service.py`
+- `frontend/src/components/ConfigGeneralSettings.jsx`
 
-23. `[a faire]` Uniformiser monitoring camera locale vs reseau
-Fichier:
+Realise:
+- Backoff exponentiel borne sur les reconnexions de flux reseau
+- Parametres `network_camera_retry_base_seconds` et `network_camera_retry_max_seconds`
+- Parametres exposes dans l'API, persistes en base et editables depuis l'UI
+- Exposition runtime du prochain retry et du delai courant
+
+23. `[fait]` Uniformiser monitoring camera locale vs reseau
+Fichiers:
 - `backend/app/services/camera_service.py`
+- `backend/app/api/routes/recognition.py`
+- `frontend/src/components/MonitoringPanel.jsx`
+
+Realise:
+- Exposition d'un statut runtime local aligne sur les flux reseau
+- Ajout des infos `has_frame`, erreurs, timestamps et temps de lecture pour la camera locale
+- Monitoring frontend unifie entre source locale et sources reseau
+- HUD principal aligne sur l'etat runtime du flux selectionne
 
 24. `[fait]` Ajouter tests avances reconnaissance
 Dossier:
@@ -302,12 +318,14 @@ Ce qui est effectivement termine a ce stade:
 - Monitoring frontend branche sur un flux WebSocket live
 - Outillage ESLint/Prettier actif sur le frontend
 - Calibration du matching avec marge configurable entre meilleurs scores
+- Monitoring local/reseau uniformise autour d'un contrat runtime commun
+- Backoff configurable sur les tentatives de reconnexion des flux reseau
 - Batterie de tests backend mise a jour et verifiee
 
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Uniformiser monitoring camera locale vs reseau
-2. Ajouter backoff camera reseau
-3. Revoir les tests frontend si une couche UI de test est introduite
-4. Continuer le durcissement reseau des flux cameras
+1. Revoir les tests frontend si une couche UI de test est introduite
+2. Continuer le durcissement reseau des flux cameras
+3. Affiner l'observabilite des flux audio/video HLS
+4. Documenter les nouveaux parametres de retry camera dans README
