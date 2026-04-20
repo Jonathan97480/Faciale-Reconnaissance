@@ -2,6 +2,7 @@ import json
 
 from app.core.database import get_connection
 from app.core.schemas import ConfigPayload, NetworkCameraProfile
+from app.services.encoder_service import peek_active_device
 from app.services.secret_crypto_service import decrypt_secret, encrypt_secret
 
 
@@ -61,16 +62,9 @@ def read_config(mask_secrets: bool = False) -> ConfigPayload:
     if mask_secrets:
         network_profiles = [_mask_profile_secrets(profile) for profile in network_profiles]
 
-    active_device = "cpu"
     preference = _sanitize_inference_device_preference(
         raw_config.get("inference_device_preference", "auto")
     )
-    try:
-        from app.services.encoder_service import configure_inference_device
-
-        active_device = configure_inference_device(preference)
-    except Exception:
-        active_device = "cpu"
 
     return ConfigPayload(
         detection_interval_seconds=float(raw_config["detection_interval_seconds"]),
@@ -85,7 +79,7 @@ def read_config(mask_secrets: bool = False) -> ConfigPayload:
         enroll_frames_count=int(raw_config.get("enroll_frames_count", "5")),
         face_crop_padding_ratio=float(raw_config.get("face_crop_padding_ratio", "0.2")),
         inference_device_preference=preference,
-        inference_device_active=active_device,
+        inference_device_active=peek_active_device(),
     )
 
 
@@ -145,5 +139,12 @@ def update_config(payload: ConfigPayload) -> ConfigPayload:
                 (value, key),
             )
         connection.commit()
+
+    try:
+        from app.services.encoder_service import configure_inference_device
+
+        configure_inference_device(payload.inference_device_preference)
+    except Exception:
+        pass
 
     return read_config(mask_secrets=False)

@@ -105,6 +105,10 @@ def configure_inference_device(preference: str) -> str:
     return _active_device
 
 
+def peek_active_device() -> str:
+    return _active_device
+
+
 def get_active_device() -> str:
     _ensure_models_loaded()
     return _active_device

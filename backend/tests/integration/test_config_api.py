@@ -72,4 +72,4 @@ def test_get_and_update_config(monkeypatch, tmp_path):
         assert row is not None
         raw_value = str(row["value"])
         assert "secret" not in raw_value
-        assert "enc:v1:" in raw_value
+        assert "enc:v2:" in raw_value

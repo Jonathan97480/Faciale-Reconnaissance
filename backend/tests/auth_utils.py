@@ -1,6 +1,7 @@
 AUTH_USERNAME = "test-admin"
 AUTH_PASSWORD = "test-password"
 AUTH_SECRET = "test-jwt-secret-with-safe-length-123456"
+CONFIG_SECRET = "test-config-secret-with-safe-length-abcdef"
 
 
 def configure_auth_env(monkeypatch) -> None:
@@ -8,6 +9,7 @@ def configure_auth_env(monkeypatch) -> None:
     monkeypatch.setenv("ADMIN_PASSWORD", AUTH_PASSWORD)
     monkeypatch.setenv("JWT_SECRET", AUTH_SECRET)
     monkeypatch.setenv("JWT_EXPIRE_MINUTES", "60")
+    monkeypatch.setenv("FACE_CONFIG_SECRET", CONFIG_SECRET)
 
 
 def login(client):

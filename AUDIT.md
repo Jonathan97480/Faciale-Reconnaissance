@@ -24,23 +24,29 @@ Realise:
 - Ajout des endpoints `login`, `logout` et `me`
 - Session frontend basee sur cookie HTTP-only
 
-2. `[fait]` Supprimer les credentials JWT par defaut dangereux dans l'auth
+2. `[fait]` Supprimer les credentials par defaut dangereux
 Fichiers:
 - `backend/app/api/routes/auth.py`
+- `backend/app/services/secret_crypto_service.py`
 
 Realise:
 - Suppression des valeurs par defaut `admin`, `adminpass`, `change_me_jwt`
+- Suppression de la valeur par defaut `dev-insecure-change-me`
 - Le backend repond desormais `503` sur les endpoints d'auth si `ADMIN_USERNAME`, `ADMIN_PASSWORD` ou `JWT_SECRET` ne sont pas configures
 
-Reste a faire:
-- `backend/app/services/secret_crypto_service.py` utilise encore `dev-insecure-change-me`
+Note:
+- Le chiffrement de configuration requiert maintenant `FACE_CONFIG_SECRET`
 
-3. `[a faire]` Remplacer la crypto maison
+3. `[fait]` Remplacer la crypto maison
 Fichiers:
 - `backend/app/services/secret_crypto_service.py`
+- `backend/requirements.txt`
 
-Objectif:
-- Remplacer XOR + SHA256 par une solution standard type `cryptography.fernet`
+Realise:
+- Migration d'ecriture vers `enc:v2:`
+- Chiffrement via `cryptography.fernet`
+- Compatibilite de lecture maintenue pour l'ancien format `enc:v1:`
+- Tests unitaires ajoutes sur le service de chiffrement
 
 4. `[a faire]` Separer biometrie et identite en 2 tables
 Fichiers:
@@ -97,7 +103,7 @@ Fichiers:
 - `backend/tests/integration/test_cameras_api.py`
 
 Verification:
-- `pytest` backend: `41 passed`
+- `pytest` backend: `44 passed`
 
 ### Priorite 2 - Important
 
@@ -105,17 +111,26 @@ Verification:
 Fichier:
 - `backend/app/services/recognition_service.py`
 
-10. `[a faire]` Eviter la reconfiguration GPU a chaque boucle
+10. `[fait]` Eviter la reconfiguration GPU a chaque boucle
 Fichier:
 - `backend/app/services/detection_loop.py`
+
+Realise:
+- La boucle applique le device uniquement quand la preference change
+- Le cache local de preference est reinitialise en cas d'erreur runtime
 
 11. `[a faire]` Ajouter des metriques de performance
 Fichier:
 - `backend/app/services/detection_loop.py`
 
-12. `[a faire]` Decoupler config et runtime
+12. `[fait]` Decoupler config et runtime
 Fichier:
 - `backend/app/services/config_service.py`
+
+Realise:
+- `read_config()` ne configure plus l'inference
+- `inference_device_active` reflete l'etat runtime courant sans effet de bord
+- `update_config()` applique explicitement la nouvelle preference pour prise en compte immediate
 
 13. `[a faire]` Refactor `MonitoringPanel`
 Fichier:
@@ -182,6 +197,9 @@ Ce qui est effectivement termine a ce stade:
 - Authentification JWT avec expiration
 - Protection des routes sensibles
 - Session frontend avec login/logout
+- Remplacement de la crypto maison par `Fernet` avec compatibilite legacy
+- Decouplage lecture config / runtime inference
+- Arret de la reconfiguration inference a chaque cycle de detection
 - Non exposition des embeddings via API
 - Suppression du rendu HTML brut pour les infos visage
 - Harmonisation du client API frontend
@@ -190,7 +208,7 @@ Ce qui est effectivement termine a ce stade:
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Remplacer `secret_crypto_service.py`
-2. Decoupler `read_config()` de la logique runtime IA
-3. Eviter `configure_inference_device()` a chaque cycle
-4. Ajouter un cache memoire des embeddings
+1. Ajouter un cache memoire des embeddings
+2. Ajouter des metriques de performance
+3. Refactor `MonitoringPanel` puis `ConfigPanel`
+4. Ajouter rate limiting sur l'API production

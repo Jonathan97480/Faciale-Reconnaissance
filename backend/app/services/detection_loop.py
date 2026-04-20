@@ -19,6 +19,7 @@ class DetectionLoop:
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._source_cursor = 0
+        self._configured_device_preference: str | None = None
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -31,6 +32,7 @@ class DetectionLoop:
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2)
+        self._configured_device_preference = None
 
     def status(self) -> dict[str, bool]:
         running = bool(self._thread and self._thread.is_alive())
@@ -59,11 +61,17 @@ class DetectionLoop:
         cursor = self._source_cursor % count
         return frame_items[cursor:] + frame_items[:cursor]
 
+    def _sync_inference_device(self, preference: str) -> None:
+        if preference == self._configured_device_preference:
+            return
+        configure_inference_device(preference)
+        self._configured_device_preference = preference
+
     def _run(self) -> None:
         while not self._stop_event.is_set():
             try:
                 config = read_config()
-                configure_inference_device(config.inference_device_preference)
+                self._sync_inference_device(config.inference_device_preference)
                 profile_urls = build_enabled_profile_urls(config.network_camera_profiles)
                 merged_network_sources = list(config.network_camera_sources)
                 for url in profile_urls:
@@ -111,6 +119,7 @@ class DetectionLoop:
                 # Keep loop alive even if one iteration fails (camera/DB/model transient errors).
                 print("[DETECTION_LOOP] iteration error:")
                 print(traceback.format_exc())
+                self._configured_device_preference = None
                 self._stop_event.wait(0.5)
 
 
