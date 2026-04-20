@@ -69,6 +69,8 @@ def test_camera_profiles_resolved_endpoint(monkeypatch, tmp_path):
             "enroll_frames_count": 5,
             "face_crop_padding_ratio": 0.2,
             "inference_device_preference": "auto",
+            "production_api_rate_limit_window_seconds": 60,
+            "production_api_rate_limit_max_requests": 30,
         }
         client.put("/api/config", json=payload)
         response = client.get("/api/cameras/profiles/resolved")
@@ -148,6 +150,8 @@ def test_playback_start_direct_and_proxy(monkeypatch, tmp_path):
             "enroll_frames_count": 5,
             "face_crop_padding_ratio": 0.2,
             "inference_device_preference": "auto",
+            "production_api_rate_limit_window_seconds": 60,
+            "production_api_rate_limit_max_requests": 30,
         }
         client.put("/api/config", json=config_payload)
 

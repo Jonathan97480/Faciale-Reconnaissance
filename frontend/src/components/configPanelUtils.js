@@ -44,6 +44,12 @@ export function toConfigPayload(state) {
     enroll_frames_count: Number(state.enroll_frames_count),
     face_crop_padding_ratio: Number(state.face_crop_padding_ratio),
     inference_device_preference: String(state.inference_device_preference ?? "auto"),
+    production_api_rate_limit_window_seconds: Number(
+      state.production_api_rate_limit_window_seconds ?? 60
+    ),
+    production_api_rate_limit_max_requests: Number(
+      state.production_api_rate_limit_max_requests ?? 30
+    ),
   };
 }
 

@@ -80,6 +80,12 @@ def read_config(mask_secrets: bool = False) -> ConfigPayload:
         face_crop_padding_ratio=float(raw_config.get("face_crop_padding_ratio", "0.2")),
         inference_device_preference=preference,
         inference_device_active=peek_active_device(),
+        production_api_rate_limit_window_seconds=float(
+            raw_config.get("production_api_rate_limit_window_seconds", "60")
+        ),
+        production_api_rate_limit_max_requests=int(
+            raw_config.get("production_api_rate_limit_max_requests", "30")
+        ),
     )
 
 
@@ -130,6 +136,12 @@ def update_config(payload: ConfigPayload) -> ConfigPayload:
         "enroll_frames_count": str(payload.enroll_frames_count),
         "face_crop_padding_ratio": str(payload.face_crop_padding_ratio),
         "inference_device_preference": str(payload.inference_device_preference),
+        "production_api_rate_limit_window_seconds": str(
+            payload.production_api_rate_limit_window_seconds
+        ),
+        "production_api_rate_limit_max_requests": str(
+            payload.production_api_rate_limit_max_requests
+        ),
     }
 
     with get_connection() as connection:

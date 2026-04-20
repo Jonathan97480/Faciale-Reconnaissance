@@ -28,6 +28,8 @@ class ConfigPayload(BaseModel):
     face_crop_padding_ratio: float = Field(default=0.2, ge=0, le=1)
     inference_device_preference: Literal["auto", "cpu", "cuda"] = "auto"
     inference_device_active: Literal["cpu", "cuda"] = "cpu"
+    production_api_rate_limit_window_seconds: float = Field(default=60, gt=0.1, le=3600)
+    production_api_rate_limit_max_requests: int = Field(default=30, ge=1, le=10000)
 
 
 class FaceCreatePayload(BaseModel):

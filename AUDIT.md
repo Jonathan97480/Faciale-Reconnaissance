@@ -103,7 +103,7 @@ Fichiers:
 - `backend/tests/integration/test_cameras_api.py`
 
 Verification:
-- `pytest` backend: `50 passed`
+- `pytest` backend: `51 passed`
 
 ### Priorite 2 - Important
 
@@ -167,9 +167,14 @@ Realise:
 - Ajout de `credentials: include`
 - Centralisation du parsing d'erreur
 
-16. `[a faire]` Ajouter rate limiting API production
+16. `[fait]` Ajouter rate limiting API production
 Fichier:
 - `backend/app/api/routes/production_recognition.py`
+
+Realise:
+- Limiteur en memoire par client/API key sur l'endpoint production
+- Parametres exposes dans la configuration backend/frontend
+- Reponse `429` avec header `Retry-After`
 
 17. `[a faire]` Separer `requirements.txt` et `requirements-dev.txt`
 Fichier:
@@ -222,6 +227,7 @@ Ce qui est effectivement termine a ce stade:
 - Metriques runtime de capture, inference et DB
 - Refactor du `MonitoringPanel` en sous-composants
 - Refactor du `ConfigPanel` en sections et helpers
+- Rate limiting configurable sur l'API production
 - Non exposition des embeddings via API
 - Suppression du rendu HTML brut pour les infos visage
 - Harmonisation du client API frontend
@@ -230,7 +236,7 @@ Ce qui est effectivement termine a ce stade:
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Ajouter rate limiting sur l'API production
-2. Separer `requirements.txt` et `requirements-dev.txt`
-3. Renommer/assainir `autres_infos_html` cote backend
-4. Separer biometrie et identite en 2 tables
+1. Separer `requirements.txt` et `requirements-dev.txt`
+2. Renommer/assainir `autres_infos_html` cote backend
+3. Separer biometrie et identite en 2 tables
+4. Ajouter cache config

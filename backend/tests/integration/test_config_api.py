@@ -20,6 +20,8 @@ def test_get_and_update_config(monkeypatch, tmp_path):
         assert initial.json()["multi_camera_cycle_budget_seconds"] == 2
         assert initial.json()["inference_device_preference"] == "auto"
         assert initial.json()["inference_device_active"] in {"cpu", "cuda"}
+        assert initial.json()["production_api_rate_limit_window_seconds"] == 60
+        assert initial.json()["production_api_rate_limit_max_requests"] == 30
 
         payload = {
             "detection_interval_seconds": 5,
@@ -47,6 +49,8 @@ def test_get_and_update_config(monkeypatch, tmp_path):
             "enroll_frames_count": 8,
             "face_crop_padding_ratio": 0.25,
             "inference_device_preference": "cpu",
+            "production_api_rate_limit_window_seconds": 120,
+            "production_api_rate_limit_max_requests": 45,
         }
         updated = client.put("/api/config", json=payload)
         assert updated.status_code == 200

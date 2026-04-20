@@ -13,6 +13,8 @@ DEFAULT_CONFIG = {
     "enroll_frames_count": "5",
     "face_crop_padding_ratio": "0.2",
     "inference_device_preference": "auto",
+    "production_api_rate_limit_window_seconds": "60",
+    "production_api_rate_limit_max_requests": "30",
 }
 
 

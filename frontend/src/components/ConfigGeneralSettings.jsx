@@ -87,6 +87,32 @@ export default function ConfigGeneralSettings({ draft, onChange }) {
             <option value="cpu">Forcer CPU</option>
           </select>
         </label>
+        <label>
+          Fenetre rate limit API prod (secondes)
+          <input
+            type="number"
+            min="1"
+            max="3600"
+            step="1"
+            value={draft.production_api_rate_limit_window_seconds ?? 60}
+            onChange={(event) =>
+              onChange("production_api_rate_limit_window_seconds", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          Max requetes API prod / fenetre
+          <input
+            type="number"
+            min="1"
+            max="10000"
+            step="1"
+            value={draft.production_api_rate_limit_max_requests ?? 30}
+            onChange={(event) =>
+              onChange("production_api_rate_limit_max_requests", event.target.value)
+            }
+          />
+        </label>
       </div>
       <p className="status-line">
         Appareil IA actif: <strong>{draft.inference_device_active ?? "cpu"}</strong>

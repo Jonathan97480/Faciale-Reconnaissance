@@ -1,9 +1,10 @@
 import base64
 import binascii
 import hmac
+import math
 import os
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 
 from app.core.schemas import (
     ImageBatchAnalyzeRequest,
@@ -12,7 +13,9 @@ from app.core.schemas import (
     ImageRecognitionResponse,
 )
 from app.services.batch_log_service import save_batch_log
+from app.services.config_service import read_config
 from app.services.image_recognition_service import analyze_image_bytes
+from app.services.rate_limit_service import production_rate_limiter
 
 router = APIRouter(prefix="/production/recognition", tags=["production-recognition"])
 
@@ -34,12 +37,32 @@ def _is_allowed_image_content_type(content_type: str | None) -> bool:
     )
 
 
+def _enforce_rate_limit(request: Request, api_key: str) -> None:
+    config = read_config(mask_secrets=True)
+    client_ip = request.client.host if request.client else "unknown"
+    bucket = f"{client_ip}:{api_key}"
+    allowed, retry_after = production_rate_limiter.check(
+        bucket=bucket,
+        limit=config.production_api_rate_limit_max_requests,
+        window_seconds=config.production_api_rate_limit_window_seconds,
+    )
+    if allowed:
+        return
+
+    raise HTTPException(
+        status_code=429,
+        detail="Trop de requetes sur l'API production",
+        headers={"Retry-After": str(max(1, math.ceil(retry_after)))},
+    )
+
+
 @router.post("/analyze-images", response_model=ImageBatchRecognitionResponse)
 def analyze_images_production(
     payload: ImageBatchAnalyzeRequest,
     request: Request,
-    _: str = Depends(require_api_key),
+    api_key: str = Depends(require_api_key),
 ) -> ImageBatchRecognitionResponse:
+    _enforce_rate_limit(request, api_key)
     items: list[ImageBatchItemResponse] = []
     success_count = 0
 
