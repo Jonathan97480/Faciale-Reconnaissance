@@ -1,27 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { ApiError } from "../api/client";
+import { apiClient, ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPanel() {
-  const { login } = useAuth();
+  const { login, refreshUser } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [setupRequired, setSetupRequired] = useState(false);
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    apiClient
+      .getAuthBootstrapStatus()
+      .then((payload) => setSetupRequired(Boolean(payload.setup_required)))
+      .catch(() => setSetupRequired(false));
+  }, []);
 
   const onSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
-    setStatus("Connexion en cours...");
+    setStatus(setupRequired ? "Creation du compte admin..." : "Connexion en cours...");
     try {
-      await login(username, password);
+      if (setupRequired) {
+        await apiClient.bootstrapAdmin({ username, password });
+        await refreshUser();
+      } else {
+        await login(username, password);
+      }
       setStatus("");
     } catch (error) {
-      if (error instanceof ApiError && error.status === 503) {
-        setStatus("Authentification non configuree sur le backend.");
+      if (error instanceof ApiError && error.status === 503 && !setupRequired) {
+        setStatus(
+          "Authentification non configuree sur le backend. Creez le premier compte admin."
+        );
+        setSetupRequired(true);
+      } else if (error instanceof ApiError && error.status === 409) {
+        setStatus("Un compte admin existe deja. Connectez-vous avec ce compte.");
+        setSetupRequired(false);
       } else {
-        setStatus("Identifiants invalides.");
+        setStatus(
+          setupRequired ? "Impossible de creer le compte admin." : "Identifiants invalides."
+        );
       }
     } finally {
       setSubmitting(false);
@@ -35,10 +56,11 @@ export default function LoginPanel() {
         style={{ maxWidth: 440, margin: "12vh auto 0" }}
       >
         <p className="eyebrow">SECURE ACCESS</p>
-        <h1>Connexion administrateur</h1>
+        <h1>{setupRequired ? "Creation du premier administrateur" : "Connexion administrateur"}</h1>
         <p className="subtitle">
-          Les routes biométriques et de configuration exigent une session
-          valide.
+          {setupRequired
+            ? "Aucun compte admin n'est configure. Creez le premier compte pour initialiser l'application."
+            : "Les routes biométriques et de configuration exigent une session valide."}
         </p>
         <form className="field-grid" onSubmit={onSubmit}>
           <label>
@@ -60,7 +82,13 @@ export default function LoginPanel() {
             />
           </label>
           <button type="submit" disabled={submitting}>
-            {submitting ? "Connexion..." : "Se connecter"}
+            {submitting
+              ? setupRequired
+                ? "Creation..."
+                : "Connexion..."
+              : setupRequired
+                ? "Creer le compte admin"
+                : "Se connecter"}
           </button>
         </form>
         <p className="status-line">{status}</p>

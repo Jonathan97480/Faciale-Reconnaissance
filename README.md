@@ -69,6 +69,11 @@ bash install-linux.sh
 cd backend
 pip install -r requirements.txt
 ```
+- Si `start-dev.bat` echoue avec `ModuleNotFoundError: No module named 'jwt'`, resynchroniser l'environnement:
+```bash
+cd backend
+..\\.venv\\Scripts\\python -m pip install -r requirements.txt
+```
 - Backend dev/tests:
 ```bash
 cd backend

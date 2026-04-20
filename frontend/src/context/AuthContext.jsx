@@ -8,8 +8,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
+  const refreshUser = async (mounted = true) => {
     apiClient
       .getCurrentUser()
       .then((currentUser) => {
@@ -27,6 +26,11 @@ export function AuthProvider({ children }) {
           setLoading(false);
         }
       });
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    refreshUser(mounted);
 
     return () => {
       mounted = false;
@@ -55,6 +59,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(user),
       login,
       logout,
+      refreshUser: () => refreshUser(true),
     }),
     [user, loading]
   );

@@ -114,6 +114,9 @@ export const apiClient = {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
   },
+  getAuthBootstrapStatus: () => request("/auth/bootstrap/status"),
+  bootstrapAdmin: (payload) =>
+    request("/auth/bootstrap", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request("/auth/logout", { method: "POST" }),
   getCurrentUser: () => request("/auth/me"),
   getConfig: (meta = {}) => request("/config", {}, meta),
