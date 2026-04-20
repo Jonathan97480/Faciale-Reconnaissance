@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 from app.core.database import get_db_path
+from app.services.network_url_validation_service import validate_network_stream_url
 
 
 class HlsSessionManager:
@@ -19,6 +20,7 @@ class HlsSessionManager:
         return get_db_path().parent / "hls_gateway"
 
     def _build_cmd(self, source_url: str, manifest_path: Path) -> list[str]:
+        validated_source_url = validate_network_stream_url(source_url)
         return [
             "ffmpeg",
             "-hide_banner",
@@ -27,7 +29,9 @@ class HlsSessionManager:
             "-rtsp_transport",
             "tcp",
             "-i",
-            source_url,
+            validated_source_url,
+            "-rw_timeout",
+            "5000000",
             "-analyzeduration",
             "1500000",
             "-probesize",
@@ -51,12 +55,71 @@ class HlsSessionManager:
         process = session.get("process")
         return bool(process and process.poll() is None)
 
+    def _read_stderr_tail(self, session: dict[str, object]) -> str:
+        process = session.get("process")
+        if not process:
+            return str(session.get("stderr_tail", ""))
+        stderr = getattr(process, "stderr", None)
+        if stderr is None:
+            return str(session.get("stderr_tail", ""))
+        try:
+            content = stderr.read()
+        except Exception:
+            content = ""
+        previous = str(session.get("stderr_tail", ""))
+        combined = f"{previous}{content}".strip()
+        if len(combined) > 500:
+            combined = combined[-500:]
+        session["stderr_tail"] = combined
+        return combined
+
+    def _manifest_stats(self, manifest_path: Path) -> dict[str, object]:
+        manifest_ready = manifest_path.exists()
+        manifest_updated_at = manifest_path.stat().st_mtime if manifest_ready else None
+        segment_count = 0
+        if manifest_ready:
+            try:
+                lines = manifest_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            except OSError:
+                lines = []
+            segment_count = sum(1 for line in lines if line.strip().endswith(".ts"))
+        return {
+            "manifest_ready": manifest_ready,
+            "manifest_updated_at": manifest_updated_at,
+            "segment_count": segment_count,
+        }
+
+    def _session_status(self, session: dict[str, object]) -> dict[str, object]:
+        manifest_path = Path(str(session["manifest"]))
+        process = session.get("process")
+        running = self._is_running(session)
+        stderr_tail = self._read_stderr_tail(session)
+        last_exit_code = None
+        if process and not running:
+            last_exit_code = process.poll()
+        stats = self._manifest_stats(manifest_path)
+        started_at = float(session["started_at"])
+        now = time.time()
+        return {
+            "id": str(session["id"]),
+            "profile_name": str(session["profile_name"]),
+            "started_at": started_at,
+            "last_used_at": float(session["last_used_at"]),
+            "running": running,
+            "manifest_ready": bool(stats["manifest_ready"]),
+            "manifest_updated_at": stats["manifest_updated_at"],
+            "segment_count": int(stats["segment_count"]),
+            "last_exit_code": last_exit_code,
+            "last_error": stderr_tail or None,
+            "uptime_seconds": max(0.0, now - started_at),
+        }
+
     def start_or_get_session(self, profile_name: str, source_url: str) -> dict[str, object]:
         with self._lock:
             existing = self._sessions_by_profile.get(profile_name)
             if existing and self._is_running(existing):
                 existing["last_used_at"] = time.time()
-                return dict(existing)
+                return self._session_status(existing)
 
             ffmpeg = shutil.which("ffmpeg")
             if not ffmpeg:
@@ -82,10 +145,11 @@ class HlsSessionManager:
                 "process": process,
                 "started_at": time.time(),
                 "last_used_at": time.time(),
+                "stderr_tail": "",
             }
             self._sessions_by_profile[profile_name] = session
             self._sessions_by_id[session_id] = session
-            return dict(session)
+            return self._session_status(session)
 
     def get_session(self, session_id: str) -> dict[str, object] | None:
         with self._lock:
@@ -93,23 +157,12 @@ class HlsSessionManager:
             if not session:
                 return None
             session["last_used_at"] = time.time()
-            return dict(session)
+            return self._session_status(session)
 
     def list_sessions(self) -> list[dict[str, object]]:
         with self._lock:
             items = list(self._sessions_by_id.values())
-        result = []
-        for session in items:
-            result.append(
-                {
-                    "id": str(session["id"]),
-                    "profile_name": str(session["profile_name"]),
-                    "started_at": float(session["started_at"]),
-                    "last_used_at": float(session["last_used_at"]),
-                    "running": self._is_running(session),
-                }
-            )
-        return result
+        return [self._session_status(session) for session in items]
 
     def stop_session(self, session_id: str) -> bool:
         with self._lock:

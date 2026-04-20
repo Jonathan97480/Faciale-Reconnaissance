@@ -2,14 +2,18 @@ from urllib.parse import quote
 from urllib.parse import urlsplit, urlunsplit
 
 from app.core.schemas import NetworkCameraProfile
+from app.services.network_url_validation_service import (
+    sanitize_network_host,
+    sanitize_network_path,
+    validate_network_stream_url,
+)
 
 
 def build_camera_profile_stream_url(profile: NetworkCameraProfile) -> str:
     protocol = profile.protocol
-    host = profile.host.strip()
+    host = sanitize_network_host(profile.host)
     port = profile.port
-    raw_path = profile.path.strip() or "/"
-    path = raw_path if raw_path.startswith("/") else f"/{raw_path}"
+    path = sanitize_network_path(profile.path)
 
     username = profile.username.strip()
     password = profile.password
@@ -21,10 +25,10 @@ def build_camera_profile_stream_url(profile: NetworkCameraProfile) -> str:
         auth = f"{auth}@"
 
     if protocol == "rtsp":
-        return f"rtsp://{auth}{host}:{port}{path}"
+        return validate_network_stream_url(f"rtsp://{auth}{host}:{port}{path}")
     if protocol in {"mjpeg", "http", "hls"}:
-        return f"http://{auth}{host}:{port}{path}"
-    return f"http://{auth}{host}:{port}{path}"
+        return validate_network_stream_url(f"http://{auth}{host}:{port}{path}")
+    return validate_network_stream_url(f"http://{auth}{host}:{port}{path}")
 
 
 def build_enabled_profile_urls(profiles: list[NetworkCameraProfile]) -> list[str]:

@@ -1,6 +1,12 @@
 from typing import Literal
 
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, field_validator
+
+from app.services.network_url_validation_service import (
+    sanitize_network_host,
+    sanitize_network_path,
+    validate_network_stream_url,
+)
 
 
 class NetworkCameraProfile(BaseModel):
@@ -14,6 +20,16 @@ class NetworkCameraProfile(BaseModel):
     has_password: bool = False
     onvif_url: str = Field(default="")
     enabled: bool = True
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, value: str) -> str:
+        return sanitize_network_host(value)
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, value: str) -> str:
+        return sanitize_network_path(value)
 
 
 class ConfigPayload(BaseModel):
@@ -33,6 +49,11 @@ class ConfigPayload(BaseModel):
     inference_device_active: Literal["cpu", "cuda"] = "cpu"
     production_api_rate_limit_window_seconds: float = Field(default=60, gt=0.1, le=3600)
     production_api_rate_limit_max_requests: int = Field(default=30, ge=1, le=10000)
+
+    @field_validator("network_camera_sources")
+    @classmethod
+    def validate_network_camera_sources(cls, value: list[str]) -> list[str]:
+        return [validate_network_stream_url(item) for item in value]
 
 
 class FaceCreatePayload(BaseModel):

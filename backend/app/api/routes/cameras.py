@@ -19,6 +19,7 @@ from app.services.hls_gateway_service import (
     stop_hls_session,
 )
 from app.services.network_camera_pool_service import network_camera_pool_status
+from app.services.network_url_validation_service import validate_network_stream_url
 from app.services.onvif_discovery_service import discover_onvif_devices
 
 router = APIRouter(
@@ -88,14 +89,15 @@ def start_camera_playback(profile_name: str = Query(min_length=1)) -> dict[str, 
 
     direct_url = build_web_playback_url(profile)
     if direct_url:
+        validated_direct_url = validate_network_stream_url(direct_url)
         return {
             "mode": "direct",
             "profile_name": profile.name,
-            "playback_url": sanitize_url_for_display(direct_url),
+            "playback_url": sanitize_url_for_display(validated_direct_url),
             "audio_expected": profile.protocol in {"hls", "http"},
         }
 
-    stream_url = build_camera_profile_stream_url(profile)
+    stream_url = validate_network_stream_url(build_camera_profile_stream_url(profile))
     try:
         session = start_hls_session(profile_name=profile.name, source_url=stream_url)
     except RuntimeError as exc:

@@ -79,6 +79,7 @@ def test_camera_profiles_resolved_endpoint(monkeypatch, tmp_path):
         assert len(profiles) == 1
         assert profiles[0]["name"] == "Main RTSP"
         assert "@" not in profiles[0]["stream_url"]
+        assert profiles[0]["stream_url"].startswith("rtsp://192.168.1.30:554/")
 
 
 def test_camera_alerts_endpoint(monkeypatch, tmp_path):
@@ -166,3 +167,62 @@ def test_playback_start_direct_and_proxy(monkeypatch, tmp_path):
         proxy = client.post("/api/cameras/playback/start?profile_name=RTSP%20Cam")
         assert proxy.status_code == 200
         assert proxy.json()["mode"] == "hls_proxy"
+
+
+def test_playback_sessions_expose_hls_observability(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
+    app = create_app()
+
+    session_dir = tmp_path / "hls-sess"
+    session_dir.mkdir()
+    manifest_path = session_dir / "index.m3u8"
+    manifest_path.write_text(
+        "#EXTM3U\n#EXTINF:2.0,\nseg-0001.ts\n#EXTINF:2.0,\nseg-0002.ts\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "app.api.routes.cameras.list_hls_sessions",
+        lambda: [
+            {
+                "id": "sess-ready",
+                "profile_name": "RTSP ready",
+                "started_at": 1000.0,
+                "last_used_at": 1010.0,
+                "running": True,
+                "manifest_ready": True,
+                "manifest_updated_at": 1012.0,
+                "segment_count": 2,
+                "last_exit_code": None,
+                "last_error": None,
+                "uptime_seconds": 12.0,
+            },
+            {
+                "id": "sess-failed",
+                "profile_name": "RTSP failed",
+                "started_at": 2000.0,
+                "last_used_at": 2001.0,
+                "running": False,
+                "manifest_ready": False,
+                "manifest_updated_at": None,
+                "segment_count": 0,
+                "last_exit_code": 1,
+                "last_error": "Connection refused",
+                "uptime_seconds": 1.0,
+            },
+        ],
+    )
+
+    with TestClient(app) as client:
+        login(client)
+        response = client.get("/api/cameras/playback/sessions")
+        assert response.status_code == 200
+        sessions = response.json()["sessions"]
+        assert len(sessions) == 2
+        assert sessions[0]["manifest_ready"] is True
+        assert sessions[0]["segment_count"] == 2
+        assert sessions[0]["last_error"] is None
+        assert sessions[1]["running"] is False
+        assert sessions[1]["last_exit_code"] == 1
+        assert sessions[1]["last_error"] == "Connection refused"

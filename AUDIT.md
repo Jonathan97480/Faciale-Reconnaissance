@@ -320,12 +320,52 @@ Ce qui est effectivement termine a ce stade:
 - Calibration du matching avec marge configurable entre meilleurs scores
 - Monitoring local/reseau uniformise autour d'un contrat runtime commun
 - Backoff configurable sur les tentatives de reconnexion des flux reseau
+- Validation et durcissement des URLs/sources de flux cameras
+- Observabilite HLS enrichie pour diagnostic des sessions de playback proxy
 - Batterie de tests backend mise a jour et verifiee
+
+27. `[fait]` Introduire une couche de tests frontend
+Fichiers:
+- `frontend/package.json`
+- `frontend/vite.config.js`
+- `frontend/src/components/LoginPanel.test.jsx`
+- `frontend/src/components/configPanelUtils.test.js`
+
+Realise:
+- Ajout de `Vitest` et `Testing Library`
+- Environnement `jsdom` configure pour les tests UI
+- Tests sur le flux login/bootstrap admin
+- Tests sur la normalisation du payload de configuration
+
+28. `[fait]` Continuer le durcissement reseau des flux cameras
+Fichiers:
+- `backend/app/core/schemas.py`
+- `backend/app/services/network_url_validation_service.py`
+- `backend/app/services/camera_profile_url_service.py`
+- `backend/app/services/hls_gateway_service.py`
+
+Realise:
+- Validation stricte des schemas d'URL reseau supportes
+- Validation du `host` et du `path` des profils camera
+- Rejet des sources libres invalides des l'etape de validation config
+- Garde-fous supplementaires sur les URLs envoyees au worker reseau et a FFmpeg
+
+29. `[fait]` Affiner l'observabilite des flux audio/video HLS
+Fichiers:
+- `backend/app/services/hls_gateway_service.py`
+- `backend/tests/unit/test_hls_gateway_service.py`
+- `backend/tests/integration/test_cameras_api.py`
+
+Realise:
+- Enrichissement du statut des sessions HLS avec `manifest_ready`, `manifest_updated_at` et `segment_count`
+- Exposition du dernier code de sortie FFmpeg et d'une erreur resumee exploitable via l'API
+- Ajout d'un `uptime_seconds` pour diagnostiquer une session qui demarre puis tombe vite
+- Couverture unitaire du calcul de statut et verification d'integration sur l'endpoint sessions
 
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Revoir les tests frontend si une couche UI de test est introduite
-2. Continuer le durcissement reseau des flux cameras
-3. Affiner l'observabilite des flux audio/video HLS
-4. Documenter les nouveaux parametres de retry camera dans README
+1. Etendre les tests frontend aux composants de monitoring/config
+2. Continuer le durcissement des flux cameras sur les chemins HLS et FFmpeg
+3. Ajouter une doc dediee aux modes camera reseau supportes
+4. Ajouter une vue UI des statuts HLS si le diagnostic doit etre accessible sans API

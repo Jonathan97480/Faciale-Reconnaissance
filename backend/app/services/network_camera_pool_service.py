@@ -7,6 +7,7 @@ import cv2
 
 from app.services.camera_event_log_service import log_camera_event
 from app.services.detection_runtime_state import get_source_annotations_updated_at
+from app.services.network_url_validation_service import validate_network_stream_url
 
 
 class NetworkCameraWorker:
@@ -16,7 +17,7 @@ class NetworkCameraWorker:
         retry_base_seconds: float = 0.5,
         retry_max_seconds: float = 8.0,
     ) -> None:
-        self.source = source
+        self.source = validate_network_stream_url(source)
         self._retry_base_seconds = retry_base_seconds
         self._retry_max_seconds = retry_max_seconds
         self._frame_lock = threading.Lock()

@@ -73,3 +73,35 @@ def test_rejects_invalid_inference_device_preference():
             camera_index=0,
             inference_device_preference="metal",
         )
+
+
+def test_rejects_invalid_network_camera_source_scheme():
+    with pytest.raises(ValidationError):
+        ConfigPayload(
+            detection_interval_seconds=3,
+            match_threshold=0.7,
+            camera_index=0,
+            network_camera_sources=["file:///tmp/video.mp4"],
+        )
+
+
+def test_rejects_invalid_network_camera_profile_host():
+    with pytest.raises(ValidationError):
+        ConfigPayload(
+            detection_interval_seconds=3,
+            match_threshold=0.7,
+            camera_index=0,
+            network_camera_profiles=[
+                {
+                    "name": "Cam bad host",
+                    "protocol": "rtsp",
+                    "host": "cam.local/path",
+                    "port": 554,
+                    "path": "/stream",
+                    "username": "",
+                    "password": "",
+                    "onvif_url": "",
+                    "enabled": True,
+                }
+            ],
+        )
