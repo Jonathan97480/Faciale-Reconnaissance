@@ -12,7 +12,10 @@ export default function MonitoringMainFeed({
   useNetworkVideoElement,
 }) {
   return (
-    <div className={`stream-wrap ${isFullscreen ? "fullscreen" : ""}`} ref={streamWrapRef}>
+    <div
+      className={`stream-wrap ${isFullscreen ? "fullscreen" : ""}`}
+      ref={streamWrapRef}
+    >
       {useNetworkVideoElement ? (
         <video
           src={currentMainFeed.source}
@@ -20,7 +23,10 @@ export default function MonitoringMainFeed({
           playsInline
           muted={false}
           onError={() => {
-            setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: false }));
+            setFeedStatus((prev) => ({
+              ...prev,
+              [currentMainFeed.key]: false,
+            }));
             setAudioEnabled(false);
             setCameraStatus(
               `Audio non supporte par ce flux (${currentMainFeed.label}). Retour en mode preview.`
@@ -36,8 +42,13 @@ export default function MonitoringMainFeed({
           src={mainFeedUrl}
           alt={`Apercu ${currentMainFeed.label}`}
           onError={() => {
-            setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: false }));
-            setCameraStatus(`Flux principal indisponible (${currentMainFeed.label}).`);
+            setFeedStatus((prev) => ({
+              ...prev,
+              [currentMainFeed.key]: false,
+            }));
+            setCameraStatus(
+              `Flux principal indisponible (${currentMainFeed.label}).`
+            );
           }}
           onLoad={() => {
             setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: true }));
@@ -47,7 +58,9 @@ export default function MonitoringMainFeed({
       )}
       <div className="hud-overlay">
         <div className="hud-corners" />
-        <div className="hud-topline">TACTICAL IDENT / {currentMainFeed.label.toUpperCase()}</div>
+        <div className="hud-topline">
+          TACTICAL IDENT / {currentMainFeed.label.toUpperCase()}
+        </div>
         <div className="hud-meta">
           <span>FACES: {detectedFaces.length}</span>
           <span>LOOP: {loopRunning ? "RUNNING" : "STOPPED"}</span>

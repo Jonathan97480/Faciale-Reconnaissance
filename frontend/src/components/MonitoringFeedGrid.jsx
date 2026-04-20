@@ -15,7 +15,8 @@ export default function MonitoringFeedGrid({
   return (
     <div className="stream-grid">
       {sideFeeds.map((feed) => {
-        const runtime = feed.type === "network" ? sourceRuntimeMap[feed.source] : null;
+        const runtime =
+          feed.type === "network" ? sourceRuntimeMap[feed.source] : null;
         const streamIsOk =
           feed.type === "network"
             ? Boolean(runtime?.has_frame) && !runtime?.last_error
@@ -61,7 +62,9 @@ export default function MonitoringFeedGrid({
                 </button>
               </div>
             )}
-            <p className="stream-source">{feed.type === "local" ? "camera locale" : feed.source}</p>
+            <p className="stream-source">
+              {feed.type === "local" ? "camera locale" : feed.source}
+            </p>
             {feed.type === "network" && runtime && (
               <p className="stream-source">
                 {runtime.last_error
@@ -75,8 +78,12 @@ export default function MonitoringFeedGrid({
               <img
                 src={feedUrl}
                 alt={`Apercu ${feed.label}`}
-                onLoad={() => setFeedStatus((prev) => ({ ...prev, [feed.key]: true }))}
-                onError={() => setFeedStatus((prev) => ({ ...prev, [feed.key]: false }))}
+                onLoad={() =>
+                  setFeedStatus((prev) => ({ ...prev, [feed.key]: true }))
+                }
+                onError={() =>
+                  setFeedStatus((prev) => ({ ...prev, [feed.key]: false }))
+                }
               />
             </div>
           </article>

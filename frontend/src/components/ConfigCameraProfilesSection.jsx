@@ -14,14 +14,24 @@ export default function ConfigCameraProfilesSection({
           <input
             type="text"
             value={newCameraProfile.name}
-            onChange={(event) => setNewCameraProfile({ ...newCameraProfile, name: event.target.value })}
+            onChange={(event) =>
+              setNewCameraProfile({
+                ...newCameraProfile,
+                name: event.target.value,
+              })
+            }
           />
         </label>
         <label>
           Protocole
           <select
             value={newCameraProfile.protocol}
-            onChange={(event) => setNewCameraProfile({ ...newCameraProfile, protocol: event.target.value })}
+            onChange={(event) =>
+              setNewCameraProfile({
+                ...newCameraProfile,
+                protocol: event.target.value,
+              })
+            }
           >
             <option value="rtsp">RTSP</option>
             <option value="mjpeg">MJPEG</option>
@@ -34,7 +44,12 @@ export default function ConfigCameraProfilesSection({
           <input
             type="text"
             value={newCameraProfile.host}
-            onChange={(event) => setNewCameraProfile({ ...newCameraProfile, host: event.target.value })}
+            onChange={(event) =>
+              setNewCameraProfile({
+                ...newCameraProfile,
+                host: event.target.value,
+              })
+            }
           />
         </label>
         <label>
@@ -44,7 +59,12 @@ export default function ConfigCameraProfilesSection({
             min="1"
             max="65535"
             value={newCameraProfile.port}
-            onChange={(event) => setNewCameraProfile({ ...newCameraProfile, port: event.target.value })}
+            onChange={(event) =>
+              setNewCameraProfile({
+                ...newCameraProfile,
+                port: event.target.value,
+              })
+            }
           />
         </label>
         <label>
@@ -52,7 +72,12 @@ export default function ConfigCameraProfilesSection({
           <input
             type="text"
             value={newCameraProfile.path}
-            onChange={(event) => setNewCameraProfile({ ...newCameraProfile, path: event.target.value })}
+            onChange={(event) =>
+              setNewCameraProfile({
+                ...newCameraProfile,
+                path: event.target.value,
+              })
+            }
           />
         </label>
         <label>
@@ -60,7 +85,12 @@ export default function ConfigCameraProfilesSection({
           <input
             type="text"
             value={newCameraProfile.username}
-            onChange={(event) => setNewCameraProfile({ ...newCameraProfile, username: event.target.value })}
+            onChange={(event) =>
+              setNewCameraProfile({
+                ...newCameraProfile,
+                username: event.target.value,
+              })
+            }
           />
         </label>
         <label>
@@ -68,7 +98,12 @@ export default function ConfigCameraProfilesSection({
           <input
             type="password"
             value={newCameraProfile.password}
-            onChange={(event) => setNewCameraProfile({ ...newCameraProfile, password: event.target.value })}
+            onChange={(event) =>
+              setNewCameraProfile({
+                ...newCameraProfile,
+                password: event.target.value,
+              })
+            }
           />
         </label>
         <label>
@@ -76,12 +111,19 @@ export default function ConfigCameraProfilesSection({
           <input
             type="text"
             value={newCameraProfile.onvif_url}
-            onChange={(event) => setNewCameraProfile({ ...newCameraProfile, onvif_url: event.target.value })}
+            onChange={(event) =>
+              setNewCameraProfile({
+                ...newCameraProfile,
+                onvif_url: event.target.value,
+              })
+            }
           />
         </label>
       </div>
       <div className="button-row" style={{ marginTop: 8 }}>
-        <button type="button" onClick={addCameraProfile}>Ajouter profil camera</button>
+        <button type="button" onClick={addCameraProfile}>
+          Ajouter profil camera
+        </button>
       </div>
       {profiles.length === 0 && (
         <p className="status-line">Aucun profil camera standard configure.</p>
@@ -91,8 +133,13 @@ export default function ConfigCameraProfilesSection({
           {profiles.map((profile, index) => (
             <li key={`${profile.name}-${index}`} className="history-row">
               <span>{profile.name}</span>
-              <span>{profile.protocol.toUpperCase()} {profile.host}:{profile.port}{profile.path}</span>
-              <button type="button" onClick={() => removeCameraProfile(index)}>Supprimer</button>
+              <span>
+                {profile.protocol.toUpperCase()} {profile.host}:{profile.port}
+                {profile.path}
+              </span>
+              <button type="button" onClick={() => removeCameraProfile(index)}>
+                Supprimer
+              </button>
             </li>
           ))}
         </ul>

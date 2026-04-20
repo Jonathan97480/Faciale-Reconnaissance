@@ -46,7 +46,9 @@ export function ConfigProvider({ children }) {
     [config, loading, error]
   );
 
-  return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
+  return (
+    <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>
+  );
 }
 
 export function useConfig() {

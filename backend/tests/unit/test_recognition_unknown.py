@@ -146,6 +146,56 @@ def test_returns_best_matching_face_when_multiple_references_exist(monkeypatch, 
     assert result.score > 0.99
 
 
+def test_returns_inconnu_when_top_matches_are_too_close(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    init_db()
+    invalidate_face_reference_cache()
+
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE config SET value = ? WHERE key = ?",
+            ("0.5", "match_threshold"),
+        )
+        conn.execute(
+            "UPDATE config SET value = ? WHERE key = ?",
+            ("0.1", "match_margin_threshold"),
+        )
+        conn.commit()
+
+    _insert_face_with_embedding("Alice", [1.0] + ([0.0] * 127))
+    _insert_face_with_embedding("Bob", [0.98, 0.02] + ([0.0] * 126))
+
+    result = recognize_face([1.0] + ([0.0] * 127))
+
+    assert result.status == "inconnu"
+    assert result.face_id is None
+
+
+def test_returns_reconnu_when_score_margin_is_sufficient(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    init_db()
+    invalidate_face_reference_cache()
+
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE config SET value = ? WHERE key = ?",
+            ("0.5", "match_threshold"),
+        )
+        conn.execute(
+            "UPDATE config SET value = ? WHERE key = ?",
+            ("0.01", "match_margin_threshold"),
+        )
+        conn.commit()
+
+    _insert_face_with_embedding("Alice", [1.0] + ([0.0] * 127))
+    _insert_face_with_embedding("Bob", [0.8, 0.2] + ([0.0] * 126))
+
+    result = recognize_face([1.0] + ([0.0] * 127))
+
+    assert result.status == "reconnu"
+    assert result.face_name == "Alice"
+
+
 def test_ignores_invalid_or_empty_embeddings_loaded_from_db(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
     init_db()

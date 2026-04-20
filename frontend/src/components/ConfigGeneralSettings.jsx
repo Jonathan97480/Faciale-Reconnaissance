@@ -9,7 +9,9 @@ export default function ConfigGeneralSettings({ draft, onChange }) {
             min="0.1"
             step="0.1"
             value={draft.detection_interval_seconds}
-            onChange={(event) => onChange("detection_interval_seconds", event.target.value)}
+            onChange={(event) =>
+              onChange("detection_interval_seconds", event.target.value)
+            }
           />
         </label>
         <label>
@@ -20,7 +22,22 @@ export default function ConfigGeneralSettings({ draft, onChange }) {
             max="1"
             step="0.01"
             value={draft.match_threshold}
-            onChange={(event) => onChange("match_threshold", event.target.value)}
+            onChange={(event) =>
+              onChange("match_threshold", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          Marge mini entre 1er et 2e match
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.01"
+            value={draft.match_margin_threshold ?? 0.03}
+            onChange={(event) =>
+              onChange("match_margin_threshold", event.target.value)
+            }
           />
         </label>
         <label>
@@ -51,18 +68,22 @@ export default function ConfigGeneralSettings({ draft, onChange }) {
             max="10"
             step="0.1"
             value={draft.multi_camera_cycle_budget_seconds ?? 2}
-            onChange={(event) => onChange("multi_camera_cycle_budget_seconds", event.target.value)}
+            onChange={(event) =>
+              onChange("multi_camera_cycle_budget_seconds", event.target.value)
+            }
           />
         </label>
         <label>
-          Nombre de frames d'enrolement
+          Nombre de frames d&apos;enrolement
           <input
             type="number"
             min="1"
             max="30"
             step="1"
             value={draft.enroll_frames_count ?? 5}
-            onChange={(event) => onChange("enroll_frames_count", event.target.value)}
+            onChange={(event) =>
+              onChange("enroll_frames_count", event.target.value)
+            }
           />
         </label>
         <label>
@@ -73,14 +94,18 @@ export default function ConfigGeneralSettings({ draft, onChange }) {
             max="1"
             step="0.01"
             value={draft.face_crop_padding_ratio ?? 0.2}
-            onChange={(event) => onChange("face_crop_padding_ratio", event.target.value)}
+            onChange={(event) =>
+              onChange("face_crop_padding_ratio", event.target.value)
+            }
           />
         </label>
         <label>
           Acceleration IA (GPU)
           <select
             value={draft.inference_device_preference ?? "auto"}
-            onChange={(event) => onChange("inference_device_preference", event.target.value)}
+            onChange={(event) =>
+              onChange("inference_device_preference", event.target.value)
+            }
           >
             <option value="auto">Auto (GPU si disponible)</option>
             <option value="cuda">Forcer GPU (CUDA)</option>
@@ -96,7 +121,10 @@ export default function ConfigGeneralSettings({ draft, onChange }) {
             step="1"
             value={draft.production_api_rate_limit_window_seconds ?? 60}
             onChange={(event) =>
-              onChange("production_api_rate_limit_window_seconds", event.target.value)
+              onChange(
+                "production_api_rate_limit_window_seconds",
+                event.target.value
+              )
             }
           />
         </label>
@@ -109,13 +137,17 @@ export default function ConfigGeneralSettings({ draft, onChange }) {
             step="1"
             value={draft.production_api_rate_limit_max_requests ?? 30}
             onChange={(event) =>
-              onChange("production_api_rate_limit_max_requests", event.target.value)
+              onChange(
+                "production_api_rate_limit_max_requests",
+                event.target.value
+              )
             }
           />
         </label>
       </div>
       <p className="status-line">
-        Appareil IA actif: <strong>{draft.inference_device_active ?? "cpu"}</strong>
+        Appareil IA actif:{" "}
+        <strong>{draft.inference_device_active ?? "cpu"}</strong>
       </p>
     </>
   );

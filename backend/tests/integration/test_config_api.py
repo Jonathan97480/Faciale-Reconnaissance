@@ -20,12 +20,14 @@ def test_get_and_update_config(monkeypatch, tmp_path):
         assert initial.json()["multi_camera_cycle_budget_seconds"] == 2
         assert initial.json()["inference_device_preference"] == "auto"
         assert initial.json()["inference_device_active"] in {"cpu", "cuda"}
+        assert initial.json()["match_margin_threshold"] == 0.03
         assert initial.json()["production_api_rate_limit_window_seconds"] == 60
         assert initial.json()["production_api_rate_limit_max_requests"] == 30
 
         payload = {
             "detection_interval_seconds": 5,
             "match_threshold": 0.72,
+            "match_margin_threshold": 0.04,
             "camera_index": 1,
             "camera_source": "",
             "network_camera_sources": [

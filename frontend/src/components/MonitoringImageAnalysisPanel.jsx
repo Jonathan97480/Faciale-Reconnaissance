@@ -5,12 +5,14 @@ export default function MonitoringImageAnalysisPanel({
 }) {
   return (
     <section className="history-panel">
-      <h3>Analyse d'image (API)</h3>
+      <h3>Analyse d&apos;image (API)</h3>
       <div className="button-row">
         <input
           type="file"
           accept="image/*"
-          onChange={(event) => setSelectedImage(event.target.files?.[0] ?? null)}
+          onChange={(event) =>
+            setSelectedImage(event.target.files?.[0] ?? null)
+          }
         />
         <button onClick={runImageAnalysis}>Analyser image</button>
       </div>
@@ -30,14 +32,21 @@ export default function MonitoringImageAnalysisPanel({
                 <strong>{face.face_name || `Inconnu #${index + 1}`}</strong>
                 <div>Statut: {face.status}</div>
                 <div>
-                  Score: {typeof face.score === "number" ? `${(face.score * 100).toFixed(1)}%` : "--"}
+                  Score:{" "}
+                  {typeof face.score === "number"
+                    ? `${(face.score * 100).toFixed(1)}%`
+                    : "--"}
                 </div>
               </div>
             </article>
           ))}
         </div>
       )}
-      {imageAnalysis && <pre className="block-json">{JSON.stringify(imageAnalysis, null, 2)}</pre>}
+      {imageAnalysis && (
+        <pre className="block-json">
+          {JSON.stringify(imageAnalysis, null, 2)}
+        </pre>
+      )}
     </section>
   );
 }

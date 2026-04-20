@@ -106,7 +106,7 @@ Fichiers:
 - `backend/tests/integration/test_cameras_api.py`
 
 Verification:
-- `pytest` backend: `64 passed`
+- `pytest` backend: `66 passed`
 
 ### Priorite 2 - Important
 
@@ -210,13 +210,31 @@ Realise:
 - Suppression du polling periodique principal cote UI
 - Proxy Vite aligne pour supporter les upgrades WebSocket en dev
 
-20. `[a faire]` Ajouter ESLint et format frontend
-Fichier:
+20. `[fait]` Ajouter ESLint et format frontend
+Fichiers:
 - `frontend/package.json`
+- `frontend/eslint.config.js`
+- `frontend/.prettierrc.json`
+- `frontend/.prettierignore`
 
-21. `[a faire]` Ameliorer calibration seuil reconnaissance
-Fichier:
+Realise:
+- Ajout des scripts `lint`, `format` et `format:check`
+- Installation et configuration ESLint pour React/Vite
+- Installation et configuration Prettier
+- Frontend reformate et verifie localement
+
+21. `[fait]` Ameliorer calibration seuil reconnaissance
+Fichiers:
 - `backend/app/services/recognition_service.py`
+- `backend/app/core/schemas.py`
+- `backend/app/services/config_service.py`
+- `frontend/src/components/ConfigGeneralSettings.jsx`
+
+Realise:
+- Ajout du parametre `match_margin_threshold`
+- Le backend retourne `inconnu` si deux candidats sont trop proches
+- Parametre expose dans l'API, persiste en base et editable depuis l'UI
+- Tests ajoutes sur l'ambiguite entre meilleur et second match
 
 22. `[a faire]` Ajouter backoff camera reseau
 Fichier:
@@ -282,12 +300,14 @@ Ce qui est effectivement termine a ce stade:
 - Tests avances de reconnaissance et de persistance detection
 - Suppression finale de la dependance legacy a la table `faces`
 - Monitoring frontend branche sur un flux WebSocket live
+- Outillage ESLint/Prettier actif sur le frontend
+- Calibration du matching avec marge configurable entre meilleurs scores
 - Batterie de tests backend mise a jour et verifiee
 
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Ajouter ESLint et format frontend
-2. Ameliorer calibration seuil reconnaissance
-3. Uniformiser monitoring camera locale vs reseau
-4. Ajouter backoff camera reseau
+1. Uniformiser monitoring camera locale vs reseau
+2. Ajouter backoff camera reseau
+3. Revoir les tests frontend si une couche UI de test est introduite
+4. Continuer le durcissement reseau des flux cameras

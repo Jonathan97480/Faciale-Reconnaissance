@@ -24,7 +24,9 @@ async function parseErrorDetail(response) {
     if (payload?.detail) {
       return String(payload.detail);
     }
-  } catch {}
+  } catch {
+    // Ignore JSON parsing errors and fall back to text response parsing.
+  }
 
   try {
     const text = await response.text();
@@ -39,12 +41,20 @@ async function request(path, options = {}, meta = {}) {
   const shouldLogConfig = path === "/config" && !meta.silent;
   const headers = new Headers(options.headers || {});
 
-  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
+  if (
+    options.body &&
+    !(options.body instanceof FormData) &&
+    !headers.has("Content-Type")
+  ) {
     headers.set("Content-Type", "application/json");
   }
 
   if (shouldLogConfig) {
-    console.info("[apiClient] request", { method, path, body: options.body || null });
+    console.info("[apiClient] request", {
+      method,
+      path,
+      body: options.body || null,
+    });
   }
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -57,7 +67,11 @@ async function request(path, options = {}, meta = {}) {
     const detail = await parseErrorDetail(response);
     const error = new ApiError(response.status, detail);
     if (shouldLogConfig) {
-      console.error("[apiClient] request failed", { method, path, message: error.message });
+      console.error("[apiClient] request failed", {
+        method,
+        path,
+        message: error.message,
+      });
     }
     throw error;
   }
@@ -103,20 +117,27 @@ export const apiClient = {
   logout: () => request("/auth/logout", { method: "POST" }),
   getCurrentUser: () => request("/auth/me"),
   getConfig: (meta = {}) => request("/config", {}, meta),
-  updateConfig: (payload) => request("/config", { method: "PUT", body: JSON.stringify(payload) }),
+  updateConfig: (payload) =>
+    request("/config", { method: "PUT", body: JSON.stringify(payload) }),
   listFaces: () => request("/faces"),
-  createFace: (payload) => request("/faces", { method: "POST", body: JSON.stringify(payload) }),
-  enrollFace: (payload) => request("/faces/enroll", { method: "POST", body: JSON.stringify(payload) }),
+  createFace: (payload) =>
+    request("/faces", { method: "POST", body: JSON.stringify(payload) }),
+  enrollFace: (payload) =>
+    request("/faces/enroll", { method: "POST", body: JSON.stringify(payload) }),
   deleteFace: (id) => request(`/faces/${id}`, { method: "DELETE" }),
   checkRecognition: (payload) =>
-    request("/recognition/check", { method: "POST", body: JSON.stringify(payload) }),
+    request("/recognition/check", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   getLoopStatus: () => request("/recognition/loop/status"),
   getCameraAlerts: () => request("/cameras/alerts"),
   discoverOnvif: (timeoutSeconds = 2) =>
     request(`/cameras/onvif/discover?timeout_seconds=${timeoutSeconds}`),
   getResolvedCameraProfiles: () => request("/cameras/profiles/resolved"),
   getLatestDetection: () => request("/recognition/latest"),
-  getDetectionHistory: (limit = 10) => request(`/recognition/history?limit=${limit}`),
+  getDetectionHistory: (limit = 10) =>
+    request(`/recognition/history?limit=${limit}`),
   analyzeImageFile: async (file) => {
     const response = await fetch(`${apiBaseUrl}/recognition/analyze-image`, {
       method: "POST",
@@ -144,7 +165,8 @@ export const apiClient = {
       body: JSON.stringify({ items }),
     });
   },
-  getRecognitionPreviewStreamUrl: () => `${apiBaseUrl}/recognition/preview/stream`,
+  getRecognitionPreviewStreamUrl: () =>
+    `${apiBaseUrl}/recognition/preview/stream`,
   getNetworkPreviewStreamUrl: (source) =>
     `${apiBaseUrl}/recognition/network-preview/stream?source=${encodeURIComponent(source)}`,
   getRecognitionLiveWebSocketUrl: () => buildWebSocketUrl("/recognition/live"),

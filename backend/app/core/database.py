@@ -5,6 +5,7 @@ from pathlib import Path
 DEFAULT_CONFIG = {
     "detection_interval_seconds": "3",
     "match_threshold": "0.6",
+    "match_margin_threshold": "0.03",
     "camera_index": "0",
     "camera_source": "",
     "network_camera_sources_json": "[]",

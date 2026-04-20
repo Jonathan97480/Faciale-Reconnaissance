@@ -74,20 +74,32 @@ def recognize_face(embedding: list[float] | None) -> RecognitionResult:
 
     config = read_config()
     threshold = config.match_threshold
+    match_margin_threshold = config.match_margin_threshold
     references = _get_face_reference_cache()
 
     best_match: dict[str, float | int | str] | None = None
+    second_best_score: float | None = None
     for entry in references:
         distance = _cosine_distance(embedding, entry["reference"])
         score = 1 / (1 + distance)
         if best_match is None or score > float(best_match["score"]):
+            if best_match is not None:
+                second_best_score = float(best_match["score"])
             best_match = {
                 "id": int(entry["id"]),
                 "name": str(entry["name"]),
                 "score": score,
             }
+            continue
+        if second_best_score is None or score > second_best_score:
+            second_best_score = score
 
     if not best_match or float(best_match["score"]) < threshold:
+        return RecognitionResult(status="inconnu")
+    if (
+        second_best_score is not None
+        and float(best_match["score"]) - second_best_score < match_margin_threshold
+    ):
         return RecognitionResult(status="inconnu")
 
     return RecognitionResult(

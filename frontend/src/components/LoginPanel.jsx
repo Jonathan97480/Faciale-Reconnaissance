@@ -30,11 +30,15 @@ export default function LoginPanel() {
 
   return (
     <main className="app-shell">
-      <section className="panel" style={{ maxWidth: 440, margin: "12vh auto 0" }}>
+      <section
+        className="panel"
+        style={{ maxWidth: 440, margin: "12vh auto 0" }}
+      >
         <p className="eyebrow">SECURE ACCESS</p>
         <h1>Connexion administrateur</h1>
         <p className="subtitle">
-          Les routes biométriques et de configuration exigent une session valide.
+          Les routes biométriques et de configuration exigent une session
+          valide.
         </p>
         <form className="field-grid" onSubmit={onSubmit}>
           <label>

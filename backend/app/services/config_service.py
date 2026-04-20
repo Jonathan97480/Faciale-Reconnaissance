@@ -88,6 +88,7 @@ def _load_config_from_db(connection) -> ConfigPayload:
     return ConfigPayload(
         detection_interval_seconds=float(raw_config["detection_interval_seconds"]),
         match_threshold=float(raw_config["match_threshold"]),
+        match_margin_threshold=float(raw_config.get("match_margin_threshold", "0.03")),
         camera_index=int(raw_config["camera_index"]),
         camera_source=raw_config.get("camera_source", ""),
         network_camera_sources=network_sources,
@@ -171,6 +172,7 @@ def update_config(payload: ConfigPayload) -> ConfigPayload:
     updates = {
         "detection_interval_seconds": str(payload.detection_interval_seconds),
         "match_threshold": str(payload.match_threshold),
+        "match_margin_threshold": str(payload.match_margin_threshold),
         "camera_index": str(payload.camera_index),
         "camera_source": str(payload.camera_source),
         "network_camera_sources_json": json.dumps(payload.network_camera_sources),

@@ -19,6 +19,7 @@ class NetworkCameraProfile(BaseModel):
 class ConfigPayload(BaseModel):
     detection_interval_seconds: float = Field(gt=0)
     match_threshold: float = Field(ge=0, le=1)
+    match_margin_threshold: float = Field(default=0.03, ge=0, le=1)
     camera_index: int = Field(ge=0)
     camera_source: str = Field(default="", description="URL réseau, chemin vidéo, ou vide pour webcam locale")
     network_camera_sources: list[str] = Field(default_factory=list, max_length=10)

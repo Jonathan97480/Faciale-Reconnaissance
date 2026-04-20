@@ -16,7 +16,9 @@ export default function ConfigNetworkSourcesSection({
           onChange={(event) => setNewNetworkSource(event.target.value)}
           style={{ width: "100%" }}
         />
-        <button type="button" onClick={addNetworkSource}>Ajouter flux</button>
+        <button type="button" onClick={addNetworkSource}>
+          Ajouter flux
+        </button>
       </div>
       {networkSources.length === 0 && (
         <p className="status-line">Aucun flux reseau configure.</p>
@@ -26,7 +28,9 @@ export default function ConfigNetworkSourcesSection({
           {networkSources.map((source) => (
             <li key={source} className="history-row">
               <span>{source}</span>
-              <button type="button" onClick={() => removeNetworkSource(source)}>Supprimer</button>
+              <button type="button" onClick={() => removeNetworkSource(source)}>
+                Supprimer
+              </button>
             </li>
           ))}
         </ul>

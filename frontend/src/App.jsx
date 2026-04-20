@@ -12,7 +12,10 @@ function AuthenticatedApp() {
   if (loading) {
     return (
       <main className="app-shell">
-        <section className="panel" style={{ maxWidth: 420, margin: "12vh auto 0" }}>
+        <section
+          className="panel"
+          style={{ maxWidth: 420, margin: "12vh auto 0" }}
+        >
           <h1>Chargement de la session</h1>
         </section>
       </main>
@@ -34,7 +37,9 @@ function AuthenticatedApp() {
           </p>
           <div className="button-row" style={{ marginTop: 12 }}>
             <span className="badge ok">Session: {user?.username}</span>
-            <button type="button" onClick={logout}>Se deconnecter</button>
+            <button type="button" onClick={logout}>
+              Se deconnecter
+            </button>
           </div>
         </header>
 

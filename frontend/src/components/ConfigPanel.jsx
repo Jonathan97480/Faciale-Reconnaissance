@@ -15,14 +15,26 @@ export default function ConfigPanel() {
   const [local, setLocal] = useState(null);
   const [status, setStatus] = useState("");
   const [newNetworkSource, setNewNetworkSource] = useState("");
-  const [newCameraProfile, setNewCameraProfile] = useState(createEmptyCameraProfile());
+  const [newCameraProfile, setNewCameraProfile] = useState(
+    createEmptyCameraProfile()
+  );
 
   if (loading) {
-    return <section className="panel"><h2>Configuration</h2><p>Chargement...</p></section>;
+    return (
+      <section className="panel">
+        <h2>Configuration</h2>
+        <p>Chargement...</p>
+      </section>
+    );
   }
 
   if (error) {
-    return <section className="panel"><h2>Configuration</h2><p>{error}</p></section>;
+    return (
+      <section className="panel">
+        <h2>Configuration</h2>
+        <p>{error}</p>
+      </section>
+    );
   }
 
   const draft = local || config;
@@ -66,7 +78,10 @@ export default function ConfigPanel() {
       return;
     }
 
-    const nextDraft = { ...base, network_camera_sources: [...current, cleaned] };
+    const nextDraft = {
+      ...base,
+      network_camera_sources: [...current, cleaned],
+    };
     setLocal(nextDraft);
     if (await persistConfig(nextDraft, "Flux reseau ajoute.")) {
       setNewNetworkSource("");
@@ -78,7 +93,9 @@ export default function ConfigPanel() {
     const current = base?.network_camera_sources ?? [];
     const nextDraft = {
       ...base,
-      network_camera_sources: current.filter((source) => source !== sourceToRemove),
+      network_camera_sources: current.filter(
+        (source) => source !== sourceToRemove
+      ),
     };
     setLocal(nextDraft);
     await persistConfig(nextDraft, `Flux reseau supprime: ${sourceToRemove}`);
@@ -98,7 +115,10 @@ export default function ConfigPanel() {
       return;
     }
 
-    const nextDraft = { ...base, network_camera_profiles: [...current, profile] };
+    const nextDraft = {
+      ...base,
+      network_camera_profiles: [...current, profile],
+    };
     setLocal(nextDraft);
     if (await persistConfig(nextDraft, "Profil camera ajoute.")) {
       setNewCameraProfile(createEmptyCameraProfile());
@@ -110,7 +130,9 @@ export default function ConfigPanel() {
     const current = base?.network_camera_profiles ?? [];
     const nextDraft = {
       ...base,
-      network_camera_profiles: current.filter((_, index) => index !== indexToRemove),
+      network_camera_profiles: current.filter(
+        (_, index) => index !== indexToRemove
+      ),
     };
     setLocal(nextDraft);
     await persistConfig(nextDraft, "Profil camera supprime.");
@@ -139,10 +161,18 @@ export default function ConfigPanel() {
       />
 
       <div className="button-row" style={{ marginTop: 10 }}>
-        <button type="button" onClick={() => shiftCamera(-1)}>Camera precedente</button>
-        <button type="button" onClick={() => shiftCamera(1)}>Camera suivante</button>
+        <button type="button" onClick={() => shiftCamera(-1)}>
+          Camera precedente
+        </button>
+        <button type="button" onClick={() => shiftCamera(1)}>
+          Camera suivante
+        </button>
       </div>
-      <button onClick={() => persistConfig(draft, "Configuration sauvegardee.")}>Enregistrer</button>
+      <button
+        onClick={() => persistConfig(draft, "Configuration sauvegardee.")}
+      >
+        Enregistrer
+      </button>
       <p className="status-line">{status}</p>
     </section>
   );
