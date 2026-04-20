@@ -48,13 +48,15 @@ Realise:
 - Compatibilite de lecture maintenue pour l'ancien format `enc:v1:`
 - Tests unitaires ajoutes sur le service de chiffrement
 
-4. `[a faire]` Separer biometrie et identite en 2 tables
+4. `[fait]` Separer biometrie et identite en 2 tables
 Fichiers:
 - `backend/app/core/database.py`
 - `backend/app/services/face_service.py`
 
-Objectif:
-- Introduire une separation `face_profiles` / `face_embeddings`
+Realise:
+- Introduction de `face_profiles` et `face_embeddings`
+- Migration des donnees legacy depuis `faces`
+- Reconnaissance et listing branches sur les nouvelles tables
 
 5. `[fait]` Supprimer ou securiser `autres_infos_html`
 Fichiers:
@@ -104,7 +106,7 @@ Fichiers:
 - `backend/tests/integration/test_cameras_api.py`
 
 Verification:
-- `pytest` backend: `51 passed`
+- `pytest` backend: `59 passed`
 
 ### Priorite 2 - Important
 
@@ -189,9 +191,14 @@ Realise:
 
 ### Priorite 3 - Confort / Scaling
 
-18. `[a faire]` Ajouter cache config
+18. `[fait]` Ajouter cache config
 Fichier:
 - `backend/app/services/config_service.py`
+
+Realise:
+- Cache memoire de la configuration
+- Invalidation explicite sur `update_config()`
+- Refresh automatique si la base SQLite change directement
 
 19. `[a faire]` Remplacer polling frontend par WebSocket
 Fichier:
@@ -213,13 +220,26 @@ Fichier:
 Fichier:
 - `backend/app/services/camera_service.py`
 
-24. `[a faire]` Ajouter tests avances reconnaissance
+24. `[fait]` Ajouter tests avances reconnaissance
 Dossier:
 - `backend/tests/`
 
-25. `[a faire]` Ameliorer README securite + prod
-Fichier:
+Realise:
+- Ajout de cas limites sur la reconnaissance unitaire
+- Validation du choix du meilleur match
+- Validation de l'ignorance des embeddings invalides ou vides
+- Validation de l'agregation et de la priorisation des detections sauvegardees
+
+25. `[fait]` Ameliorer README securite + prod
+Fichiers:
 - `README.md`
+- `SECURITE.md`
+
+Realise:
+- Documentation des variables d'environnement obligatoires et optionnelles
+- Clarification de l'auth admin JWT par cookie HTTP-only
+- Documentation de l'API production `x-api-key`
+- Ajout des recommandations de deploiement, CORS et rate limiting
 
 ## Lot Realise
 
@@ -236,15 +256,19 @@ Ce qui est effectivement termine a ce stade:
 - Refactor du `ConfigPanel` en sections et helpers
 - Rate limiting configurable sur l'API production
 - Separation des dependances runtime et dev
+- Separation biometrie / identite en tables distinctes
+- Cache memoire de la configuration avec refresh sur changement DB
+- Documentation README/SECURITE alignee sur l'etat reel du projet
 - Non exposition des embeddings via API
 - Suppression du rendu HTML brut pour les infos visage
 - Harmonisation du client API frontend
+- Tests avances de reconnaissance et de persistance detection
 - Batterie de tests backend mise a jour et verifiee
 
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Separer biometrie et identite en 2 tables
-2. Ajouter cache config
-3. Ameliorer README securite + prod
-4. Ajouter tests avances reconnaissance
+1. Eventuelle migration finale pour retirer l'usage legacy de la table `faces`
+2. Remplacer le polling frontend par WebSocket
+3. Ajouter ESLint et format frontend
+4. Ameliorer calibration seuil reconnaissance

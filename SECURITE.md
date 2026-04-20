@@ -1,42 +1,98 @@
-# Sécurité du projet Reconnaissance Faciale
+# Securite du projet Reconnaissance Faciale
 
-## 1. Clés et secrets
+## 1. Secrets obligatoires
 
-- Toutes les clés (API, admin, etc.) doivent être stockées dans le fichier `.env` (jamais en dur dans le code).
-- Ne jamais versionner `.env` (utiliser `.env.example` pour référence).
+Variables requises par le backend:
 
-## 2. CORS et réseau
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `JWT_SECRET`
+- `FACE_CONFIG_SECRET`
+- `FACE_API_KEY`
 
-- Le backend n’accepte que les requêtes du frontend configuré (`FRONTEND_ORIGIN`).
-- En production, lancer FastAPI sur `127.0.0.1` et placer un reverse proxy (nginx, traefik…) devant.
-- Toujours utiliser HTTPS en production.
+Variables optionnelles:
 
-## 3. Authentification
+- `JWT_EXPIRE_MINUTES` (`60` par defaut)
+- `FRONTEND_ORIGINS` (liste separee par virgules)
+- `FRONTEND_ORIGIN` (compatibilite legacy)
 
-- L’API admin est protégée par une clé forte (`FACE_ADMIN_API_KEY`).
-- Pour une sécurité avancée, activer l’authentification utilisateur (voir ci-dessous).
+Regles:
 
-## 4. Ports
+- stocker les secrets hors du code source
+- ne jamais versionner les fichiers contenant les secrets
+- utiliser des valeurs longues, uniques et aleatoires
+- ne pas reutiliser la meme valeur pour `JWT_SECRET`, `FACE_CONFIG_SECRET` et `FACE_API_KEY`
 
-- N’exposez que les ports nécessaires (8000 pour l’API, 5173 pour le dev frontend).
-- Fermez les autres ports sur le firewall.
+## 2. Auth admin
 
-## 5. Utilisateurs (option JWT)
+L'auth admin est active dans le projet actuel.
 
-Pour activer l’authentification JWT :
+Comportement:
 
-1. Créez un utilisateur admin avec mot de passe.
-2. Ajoutez un endpoint `/auth/login` qui retourne un JWT.
-3. Protégez les routes sensibles avec un décorateur qui vérifie le JWT.
+- `POST /api/auth/login` verifie `ADMIN_USERNAME` et `ADMIN_PASSWORD`
+- le backend emet un JWT signe par `JWT_SECRET`
+- la session est stockee dans le cookie HTTP-only `face_access_token`
+- l'expiration est controlee par `JWT_EXPIRE_MINUTES`
 
-## 6. Mises à jour
+Routes protegees:
 
-- Gardez vos dépendances à jour (pip, npm).
+- `/api/config`
+- `/api/faces`
+- `/api/faces/enroll`
+- `/api/recognition/*`
+- `/api/cameras/*`
+- `/api/admin/batch-logs`
 
-## 7. Logs
+## 3. Chiffrement des secrets applicatifs
 
-- Ne logguez jamais de secrets ou de données sensibles.
+- les secrets de configuration stockes en base sont chiffres via `Fernet`
+- la cle derive de `FACE_CONFIG_SECRET`
+- si `FACE_CONFIG_SECRET` est absente, le backend ne peut pas chiffrer/dechiffrer ces valeurs
+
+## 4. API production
+
+L'API batch de production est separee de l'auth admin.
+
+Regles:
+
+- endpoint concerne: `POST /api/production/recognition/analyze-images`
+- header requis: `x-api-key`
+- la valeur attendue est `FACE_API_KEY`
+- si `FACE_API_KEY` n'est pas definie, l'endpoint repond `503`
+
+Rate limiting:
+
+- la limite est configurable dans l'application
+- `production_api_rate_limit_window_seconds` par defaut `60`
+- `production_api_rate_limit_max_requests` par defaut `30`
+- en depassement, l'API repond `429` avec `Retry-After`
+
+## 5. CORS et exposition reseau
+
+- configurer `FRONTEND_ORIGINS` avec uniquement les origines front autorisees
+- en production, lancer FastAPI sur `127.0.0.1`
+- placer un reverse proxy devant si exposition externe necessaire
+- utiliser HTTPS en production
+
+## 6. Ports et surface d'exposition
+
+- n'exposer que les ports necessaires
+- en dev, le frontend Vite utilise generalement `5173`
+- le backend local utilise generalement `8001`
+- fermer les autres ports au niveau firewall ou reverse proxy
+
+## 7. Logs et donnees sensibles
+
+- ne jamais logguer de secrets
+- ne pas exposer les embeddings faciaux via l'API
+- ne pas rendre de HTML brut issu des donnees utilisateur
+
+## 8. Hygiene operationnelle
+
+- garder les dependances Python et npm a jour
+- utiliser `backend/requirements.txt` pour le runtime
+- utiliser `backend/requirements-dev.txt` uniquement pour le dev/test
 
 ---
 
-Voir aussi AGENTS.md pour les règles de configuration et d’API.
+Voir aussi `AGENTS.md`, `README.md` et `AUDIT.md`.

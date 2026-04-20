@@ -30,7 +30,8 @@ Application de reconnaissance faciale avec:
   - monitoring par flux (erreur, latence lecture, derniere frame, derniere detection)
 - Securite/API:
   - endpoint batch production protege par `x-api-key`
-  - consultation des logs batch admin protegee par `x-admin-api-key`
+  - routes admin protegees par session JWT HTTP-only
+  - consultation des logs batch admin reservee aux sessions admin authentifiees
 
 ## Architecture
 
@@ -86,6 +87,34 @@ npm install
 
 ## Lancement
 
+### Variables d'environnement obligatoires
+
+Le backend exige maintenant les secrets suivants avant demarrage:
+
+```bash
+ADMIN_USERNAME=admin-local
+ADMIN_PASSWORD=mot-de-passe-fort
+JWT_SECRET=secret-jwt-long-et-aleatoire
+FACE_CONFIG_SECRET=secret-config-long-et-aleatoire
+FACE_API_KEY=cle-api-production-longue-et-aleatoire
+```
+
+Variables optionnelles utiles:
+
+```bash
+JWT_EXPIRE_MINUTES=60
+FRONTEND_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+DEV_MODE=1
+```
+
+Notes:
+
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD` et `JWT_SECRET` sont requis pour l'auth admin backend
+- `FACE_CONFIG_SECRET` est requis pour chiffrer les secrets stockes en base
+- `FACE_API_KEY` est requis pour l'endpoint production `/api/production/recognition/analyze-images`
+- `FRONTEND_ORIGINS` accepte une liste separee par virgules; `FRONTEND_ORIGIN` reste tolere pour compatibilite
+- si ces variables critiques ne sont pas configurees, certaines routes repondront `503`
+
 ### Option recommandee (Windows)
 
 Depuis la racine:
@@ -115,6 +144,27 @@ npm run dev
 
 Le frontend utilise un proxy Vite (`/api`) vers `http://127.0.0.1:8001`.
 
+### Authentification admin
+
+Routes concernees:
+
+- `/api/auth/login`
+- `/api/auth/logout`
+- `/api/auth/me`
+- `/api/config`
+- `/api/faces`
+- `/api/faces/enroll`
+- `/api/recognition/*`
+- `/api/cameras/*`
+- `/api/admin/batch-logs`
+
+Comportement:
+
+- le login cree un cookie HTTP-only `face_access_token`
+- la session expire selon `JWT_EXPIRE_MINUTES` (`60` minutes par defaut)
+- le frontend React inclut automatiquement les credentials sur les appels admin
+- l'API production batch reste separee et utilise `x-api-key`, pas la session admin
+
 ## Configuration runtime (persistee SQLite)
 
 Champs principaux:
@@ -129,6 +179,8 @@ Champs principaux:
 - `enroll_frames_count`
 - `face_crop_padding_ratio`
 - `inference_device_preference` (`auto|cpu|cuda`)
+- `production_api_rate_limit_window_seconds`
+- `production_api_rate_limit_max_requests`
 
 Notes:
 
@@ -140,6 +192,7 @@ Notes:
 - en mode `auto`, le backend utilise le GPU CUDA si disponible, sinon CPU
 - `requirements.txt` installe la pile runtime CPU par defaut; pour CUDA, utiliser la commande GPU ci-dessus
 - `requirements-dev.txt` ajoute les dependances de test et de developpement
+- le rate limit de l'API production est persiste en base et editable depuis l'UI React
 
 ## Endpoints camera supplementaires
 
@@ -149,6 +202,26 @@ Notes:
   - logs des erreurs/connexions flux camera
 - `GET /api/cameras/profiles/resolved`
   - profils resolus en URLs (version sans credentials)
+
+## Production et securite
+
+Recommandations minimales:
+
+- lancer FastAPI sur `127.0.0.1` et placer un reverse proxy devant si exposition reseau necessaire
+- utiliser HTTPS en production
+- definir des secrets longs, uniques et non versionnes
+- ne pas reutiliser `FACE_API_KEY` comme mot de passe admin ou secret JWT
+- limiter `FRONTEND_ORIGINS` aux origines React reelles
+- utiliser `requirements.txt` pour le runtime, `requirements-dev.txt` uniquement pour dev/tests
+
+API production:
+
+- endpoint: `POST /api/production/recognition/analyze-images`
+- header requis: `x-api-key: <FACE_API_KEY>`
+- rate limit par client/API key configurable via:
+  - `production_api_rate_limit_window_seconds` (defaut `60`)
+  - `production_api_rate_limit_max_requests` (defaut `30`)
+- en cas de depassement, l'API repond `429` avec header `Retry-After`
 
 ## Tests
 

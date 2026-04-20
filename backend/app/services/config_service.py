@@ -1,9 +1,16 @@
 import json
+import threading
+from pathlib import Path
 
-from app.core.database import get_connection
+from app.core.database import get_connection, get_db_path
 from app.core.schemas import ConfigPayload, NetworkCameraProfile
 from app.services.encoder_service import peek_active_device
 from app.services.secret_crypto_service import decrypt_secret, encrypt_secret
+
+_cache_lock = threading.Lock()
+_config_cache: ConfigPayload | None = None
+_config_cache_db_path: str | None = None
+_config_cache_fingerprint: tuple[int, int] | None = None
 
 
 def _profile_identity_key(profile: NetworkCameraProfile) -> str:
@@ -32,11 +39,26 @@ def _sanitize_inference_device_preference(value: str | None) -> str:
     return "auto"
 
 
-def read_config(mask_secrets: bool = False) -> ConfigPayload:
-    with get_connection() as connection:
-        rows = connection.execute("SELECT key, value FROM config").fetchall()
+def invalidate_config_cache() -> None:
+    global _config_cache, _config_cache_db_path, _config_cache_fingerprint
+    with _cache_lock:
+        _config_cache = None
+        _config_cache_db_path = None
+        _config_cache_fingerprint = None
 
+
+def _read_db_fingerprint(db_path: Path) -> tuple[int, int]:
+    try:
+        stat = db_path.stat()
+    except FileNotFoundError:
+        return (0, 0)
+    return (stat.st_mtime_ns, stat.st_size)
+
+
+def _load_config_from_db(connection) -> ConfigPayload:
+    rows = connection.execute("SELECT key, value FROM config").fetchall()
     raw_config = {row["key"]: row["value"] for row in rows}
+
     raw_sources = raw_config.get("network_camera_sources_json", "[]")
     network_sources: list[str] = []
     try:
@@ -59,13 +81,10 @@ def read_config(mask_secrets: bool = False) -> ConfigPayload:
                     network_profiles.append(profile)
     except (json.JSONDecodeError, TypeError, ValueError):
         network_profiles = []
-    if mask_secrets:
-        network_profiles = [_mask_profile_secrets(profile) for profile in network_profiles]
 
     preference = _sanitize_inference_device_preference(
         raw_config.get("inference_device_preference", "auto")
     )
-
     return ConfigPayload(
         detection_interval_seconds=float(raw_config["detection_interval_seconds"]),
         match_threshold=float(raw_config["match_threshold"]),
@@ -79,7 +98,7 @@ def read_config(mask_secrets: bool = False) -> ConfigPayload:
         enroll_frames_count=int(raw_config.get("enroll_frames_count", "5")),
         face_crop_padding_ratio=float(raw_config.get("face_crop_padding_ratio", "0.2")),
         inference_device_preference=preference,
-        inference_device_active=peek_active_device(),
+        inference_device_active="cpu",
         production_api_rate_limit_window_seconds=float(
             raw_config.get("production_api_rate_limit_window_seconds", "60")
         ),
@@ -87,6 +106,39 @@ def read_config(mask_secrets: bool = False) -> ConfigPayload:
             raw_config.get("production_api_rate_limit_max_requests", "30")
         ),
     )
+
+
+def _get_cached_base_config() -> ConfigPayload:
+    global _config_cache, _config_cache_db_path, _config_cache_fingerprint
+    db_path = get_db_path()
+    current_db_path = str(db_path)
+    fingerprint = _read_db_fingerprint(db_path)
+    with get_connection() as connection:
+        with _cache_lock:
+            if (
+                _config_cache is not None
+                and _config_cache_db_path == current_db_path
+                and _config_cache_fingerprint == fingerprint
+            ):
+                return _config_cache.model_copy(deep=True)
+
+        loaded = _load_config_from_db(connection)
+
+    with _cache_lock:
+        _config_cache = loaded
+        _config_cache_db_path = current_db_path
+        _config_cache_fingerprint = fingerprint
+        return loaded.model_copy(deep=True)
+
+
+def read_config(mask_secrets: bool = False) -> ConfigPayload:
+    config = _get_cached_base_config()
+    config.inference_device_active = peek_active_device()
+    if mask_secrets:
+        config.network_camera_profiles = [
+            _mask_profile_secrets(profile) for profile in config.network_camera_profiles
+        ]
+    return config
 
 
 def update_config(payload: ConfigPayload) -> ConfigPayload:
@@ -151,6 +203,8 @@ def update_config(payload: ConfigPayload) -> ConfigPayload:
                 (value, key),
             )
         connection.commit()
+
+    invalidate_config_cache()
 
     try:
         from app.services.encoder_service import configure_inference_device
