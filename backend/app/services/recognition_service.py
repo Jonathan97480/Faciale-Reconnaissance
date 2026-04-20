@@ -68,14 +68,14 @@ def _get_face_reference_cache() -> list[dict[str, object]]:
         return list(_face_reference_cache)
 
 
-def recognize_face(embedding: list[float] | None) -> RecognitionResult:
+def _recognize_face_against_references(
+    embedding: list[float] | None,
+    references: list[dict[str, object]],
+    threshold: float,
+    match_margin_threshold: float,
+) -> RecognitionResult:
     if not embedding:
         return RecognitionResult(status="inconnu")
-
-    config = read_config()
-    threshold = config.match_threshold
-    match_margin_threshold = config.match_margin_threshold
-    references = _get_face_reference_cache()
 
     best_match: dict[str, float | int | str] | None = None
     second_best_score: float | None = None
@@ -110,8 +110,28 @@ def recognize_face(embedding: list[float] | None) -> RecognitionResult:
     )
 
 
+def recognize_face(embedding: list[float] | None) -> RecognitionResult:
+    config = read_config()
+    return _recognize_face_against_references(
+        embedding=embedding,
+        references=_get_face_reference_cache(),
+        threshold=config.match_threshold,
+        match_margin_threshold=config.match_margin_threshold,
+    )
+
+
 def recognize_faces(embeddings: list[list[float]]) -> list[RecognitionResult]:
-    return [recognize_face(embedding) for embedding in embeddings]
+    config = read_config()
+    references = _get_face_reference_cache()
+    return [
+        _recognize_face_against_references(
+            embedding=embedding,
+            references=references,
+            threshold=config.match_threshold,
+            match_margin_threshold=config.match_margin_threshold,
+        )
+        for embedding in embeddings
+    ]
 
 
 def _result_to_dict(result: RecognitionResult) -> dict[str, object | None]:
@@ -125,7 +145,7 @@ def _result_to_dict(result: RecognitionResult) -> dict[str, object | None]:
 
 def save_detection(results: list[RecognitionResult]) -> None:
     if not results:
-        results = [RecognitionResult(status="inconnu")]
+        return
 
     primary = max(
         results,

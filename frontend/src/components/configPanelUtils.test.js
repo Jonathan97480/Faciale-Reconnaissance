@@ -56,6 +56,10 @@ describe("configPanelUtils", () => {
       multi_camera_cycle_budget_seconds: "2",
       network_camera_retry_base_seconds: "0.5",
       network_camera_retry_max_seconds: "8",
+      unstable_source_failure_threshold: "4",
+      unstable_source_cycle_skip: "2",
+      hls_proxy_max_sessions: "3",
+      hls_proxy_idle_ttl_seconds: "45",
       enroll_frames_count: "5",
       face_crop_padding_ratio: "0.2",
       inference_device_preference: "auto",
@@ -83,6 +87,10 @@ describe("configPanelUtils", () => {
     expect(payload.match_margin_threshold).toBe(0.05);
     expect(payload.network_camera_retry_base_seconds).toBe(0.5);
     expect(payload.network_camera_retry_max_seconds).toBe(8);
+    expect(payload.unstable_source_failure_threshold).toBe(4);
+    expect(payload.unstable_source_cycle_skip).toBe(2);
+    expect(payload.hls_proxy_max_sessions).toBe(3);
+    expect(payload.hls_proxy_idle_ttl_seconds).toBe(45);
   });
 
   it("normalizes a single camera profile", () => {

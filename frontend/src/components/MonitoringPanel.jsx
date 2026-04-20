@@ -2,45 +2,12 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { apiClient } from "../api/client";
 import { useConfig } from "../context/ConfigContext";
+import { toConfigPayload } from "./configPanelUtils";
 import MonitoringFeedGrid from "./MonitoringFeedGrid";
 import MonitoringHistoryPanel from "./MonitoringHistoryPanel";
 import MonitoringImageAnalysisPanel from "./MonitoringImageAnalysisPanel";
 import MonitoringMainFeed from "./MonitoringMainFeed";
-
-function buildConfigPayload(state) {
-  return {
-    detection_interval_seconds: Number(state?.detection_interval_seconds ?? 3),
-    match_threshold: Number(state?.match_threshold ?? 0.6),
-    camera_index: Number(state?.camera_index ?? 0),
-    camera_source: String(state?.camera_source ?? ""),
-    network_camera_sources: (state?.network_camera_sources ?? [])
-      .map((source) => String(source).trim())
-      .filter((source, index, arr) => source && arr.indexOf(source) === index)
-      .slice(0, 10),
-    network_camera_profiles: (state?.network_camera_profiles ?? [])
-      .map((profile) => ({
-        ...profile,
-        name: String(profile.name ?? "").trim(),
-        host: String(profile.host ?? "").trim(),
-        path: String(profile.path ?? "/"),
-        username: String(profile.username ?? ""),
-        password: String(profile.password ?? ""),
-        onvif_url: String(profile.onvif_url ?? ""),
-        port: Number(profile.port ?? 554),
-        enabled: Boolean(profile.enabled),
-      }))
-      .filter((profile) => profile.name && profile.host)
-      .slice(0, 10),
-    multi_camera_cycle_budget_seconds: Number(
-      state?.multi_camera_cycle_budget_seconds ?? 2
-    ),
-    enroll_frames_count: Number(state?.enroll_frames_count ?? 5),
-    face_crop_padding_ratio: Number(state?.face_crop_padding_ratio ?? 0.2),
-    inference_device_preference: String(
-      state?.inference_device_preference ?? "auto"
-    ),
-  };
-}
+import MonitoringRuntimeMetricsPanel from "./MonitoringRuntimeMetricsPanel";
 
 function formatDetectionScore(score) {
   return typeof score === "number" ? `${(score * 100).toFixed(1)}%` : "--";
@@ -117,7 +84,7 @@ export default function MonitoringPanel() {
           freshConfig.network_camera_sources ?? []
         ).filter((source) => source !== sourceToRemove),
       };
-      await apiClient.updateConfig(buildConfigPayload(next));
+      await apiClient.updateConfig(toConfigPayload(next));
       await refreshLoopState();
       setStatus(`Flux reseau supprime: ${sourceToRemove}`);
     } catch {
@@ -340,6 +307,13 @@ export default function MonitoringPanel() {
         />
       </MonitoringHistoryPanel>
 
+      <MonitoringRuntimeMetricsPanel
+        captureSettings={loopState?.capture_settings ?? null}
+        localRuntime={localRuntime}
+        networkSources={loopState?.network_cameras?.sources ?? []}
+        performance={loopState?.loop?.performance ?? null}
+      />
+
       <div className="button-row">
         <button onClick={runCheck}>Lancer verification manuelle</button>
         {currentMainFeed.type === "network" && (
@@ -416,9 +390,6 @@ export default function MonitoringPanel() {
         )}
       </MonitoringHistoryPanel>
 
-      {loopState && (
-        <pre className="block-json">{JSON.stringify(loopState, null, 2)}</pre>
-      )}
       {latestDetection && (
         <pre className="block-json">
           {JSON.stringify(latestDetection, null, 2)}

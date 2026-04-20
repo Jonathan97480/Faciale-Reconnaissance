@@ -50,6 +50,12 @@ export function toConfigPayload(state) {
     network_camera_retry_max_seconds: Number(
       state.network_camera_retry_max_seconds ?? 8
     ),
+    unstable_source_failure_threshold: Number(
+      state.unstable_source_failure_threshold ?? 3
+    ),
+    unstable_source_cycle_skip: Number(state.unstable_source_cycle_skip ?? 1),
+    hls_proxy_max_sessions: Number(state.hls_proxy_max_sessions ?? 2),
+    hls_proxy_idle_ttl_seconds: Number(state.hls_proxy_idle_ttl_seconds ?? 30),
     enroll_frames_count: Number(state.enroll_frames_count),
     face_crop_padding_ratio: Number(state.face_crop_padding_ratio),
     inference_device_preference: String(

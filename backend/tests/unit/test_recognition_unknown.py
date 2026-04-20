@@ -3,11 +3,13 @@ import sqlite3
 
 from app.core.database import get_connection, init_db
 from app.core.schemas import RecognitionResult
+from app.services.config_service import read_config
 from app.services.recognition_service import (
     get_detection_history,
     get_latest_detection,
     invalidate_face_reference_cache,
     recognize_face,
+    recognize_faces,
     save_detection,
 )
 
@@ -273,6 +275,8 @@ def test_detection_history_limits_and_preserves_unknown_fallback(monkeypatch, tm
 
     save_detection([])
     unknown_entry = get_latest_detection()
+    save_detection([RecognitionResult(status="inconnu")])
+    persisted_unknown_entry = get_latest_detection()
     for index in range(60):
         save_detection(
             [
@@ -287,9 +291,34 @@ def test_detection_history_limits_and_preserves_unknown_fallback(monkeypatch, tm
 
     history = get_detection_history(limit=100)
 
-    assert unknown_entry is not None
-    assert unknown_entry["status"] == "inconnu"
-    assert unknown_entry["faces"][0]["status"] == "inconnu"
+    assert unknown_entry is None
+    assert persisted_unknown_entry is not None
+    assert persisted_unknown_entry["status"] == "inconnu"
+    assert persisted_unknown_entry["faces"][0]["status"] == "inconnu"
     assert len(history) == 50
     assert history[0]["face_id"] == 60
     assert history[-1]["face_id"] == 11
+
+
+def test_recognize_faces_reads_config_once_for_a_batch(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    init_db()
+    invalidate_face_reference_cache()
+    _insert_face_with_embedding("Alice", [0.1] * 128)
+
+    read_count = {"config": 0}
+    original_read_config = read_config
+
+    def counting_read_config():
+        read_count["config"] += 1
+        return original_read_config()
+
+    monkeypatch.setattr(
+        "app.services.recognition_service.read_config",
+        counting_read_config,
+    )
+
+    results = recognize_faces([[0.1] * 128, [0.2] * 128])
+
+    assert len(results) == 2
+    assert read_count["config"] == 1

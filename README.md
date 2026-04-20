@@ -218,6 +218,10 @@ Notes monitoring reseau:
 - les stats runtime exposent l'etat de chaque flux, y compris `last_error`, `consecutive_failures`, `retry_delay_seconds` et `next_retry_at`
 - la camera locale et les flux reseau suivent maintenant un contrat runtime proche dans le monitoring
 
+Documentation dediee:
+
+- voir [MODES_CAMERA_RESEAU.md](MODES_CAMERA_RESEAU.md) pour le detail des modes `RTSP`, `MJPEG`, `HTTP`, `HLS`, du playback direct, et du proxy HLS backend
+
 ## Production et securite
 
 Recommandations minimales:
@@ -338,3 +342,4 @@ python dev_tools/actor_movie_test_tool.py configure-stream --url "http://127.0.0
 - Backend: RTSP est supporte pour la capture/detection.
 - Frontend navigateur: RTSP direct n'est pas lu nativement.
 - Pour l'audio en UI web, preferer une source web compatible (HLS/HTTP audio-enabled).
+- Le proxy HLS backend est reserve aux profils `rtsp` et sert uniquement `index.m3u8` et `seg-*.ts`.

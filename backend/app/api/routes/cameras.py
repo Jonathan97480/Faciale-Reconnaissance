@@ -99,8 +99,13 @@ def start_camera_playback(profile_name: str = Query(min_length=1)) -> dict[str, 
 
     stream_url = validate_network_stream_url(build_camera_profile_stream_url(profile))
     try:
-        session = start_hls_session(profile_name=profile.name, source_url=stream_url)
-    except RuntimeError as exc:
+        session = start_hls_session(
+            profile_name=profile.name,
+            source_url=stream_url,
+            max_sessions=config.hls_proxy_max_sessions,
+            idle_ttl_seconds=config.hls_proxy_idle_ttl_seconds,
+        )
+    except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     session_id = str(session["id"])
@@ -115,7 +120,8 @@ def start_camera_playback(profile_name: str = Query(min_length=1)) -> dict[str, 
 
 @router.get("/playback/sessions")
 def get_playback_sessions() -> dict[str, object]:
-    return {"sessions": list_hls_sessions()}
+    config = read_config(mask_secrets=True)
+    return {"sessions": list_hls_sessions(idle_ttl_seconds=config.hls_proxy_idle_ttl_seconds)}
 
 
 @router.delete("/playback/sessions/{session_id}")
@@ -128,7 +134,12 @@ def delete_playback_session(session_id: str) -> dict[str, object]:
 
 @router.get("/hls/{session_id}/{filename:path}")
 def get_hls_asset(session_id: str, filename: str):
-    resolved = resolve_hls_file(session_id, filename)
+    config = read_config(mask_secrets=True)
+    resolved = resolve_hls_file(
+        session_id,
+        filename,
+        idle_ttl_seconds=config.hls_proxy_idle_ttl_seconds,
+    )
     if resolved is None:
         raise HTTPException(status_code=404, detail="HLS asset introuvable")
     media_type = "application/vnd.apple.mpegurl"

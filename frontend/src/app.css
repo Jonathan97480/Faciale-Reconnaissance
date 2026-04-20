@@ -344,6 +344,32 @@ button:disabled {
   gap: 10px;
 }
 
+.metrics-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.metric-card {
+  border: 1px solid rgba(36, 215, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(8, 15, 23, 0.82);
+  padding: 10px;
+}
+
+.metric-card strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #e8f8ff;
+}
+
+.metric-list {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+}
+
 .stream-card {
   border: 1px solid rgba(36, 215, 255, 0.2);
   border-radius: 10px;
@@ -395,6 +421,13 @@ button:disabled {
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(9, 17, 26, 0.7);
+}
+
+.history-row-runtime {
+  grid-template-columns: minmax(180px, 2fr) repeat(4, minmax(90px, 1fr)) minmax(
+      140px,
+      1.2fr
+    );
 }
 
 .crop-grid {

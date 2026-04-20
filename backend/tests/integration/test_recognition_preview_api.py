@@ -81,10 +81,15 @@ def test_loop_status_includes_performance_metrics(monkeypatch, tmp_path):
     assert set(performance).issuperset(
         {
             "capture_ms",
+            "decode_ms",
+            "extract_ms",
+            "matching_ms",
             "inference_ms",
             "db_ms",
             "cycle_ms",
             "processed_sources",
+            "skipped_stale_sources",
+            "skipped_unstable_sources",
             "results_count",
             "updated_at",
         }

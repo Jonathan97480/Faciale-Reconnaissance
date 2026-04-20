@@ -20,6 +20,10 @@ def test_get_and_update_config(monkeypatch, tmp_path):
         assert initial.json()["multi_camera_cycle_budget_seconds"] == 2
         assert initial.json()["network_camera_retry_base_seconds"] == 0.5
         assert initial.json()["network_camera_retry_max_seconds"] == 8
+        assert initial.json()["unstable_source_failure_threshold"] == 3
+        assert initial.json()["unstable_source_cycle_skip"] == 1
+        assert initial.json()["hls_proxy_max_sessions"] == 2
+        assert initial.json()["hls_proxy_idle_ttl_seconds"] == 30
         assert initial.json()["inference_device_preference"] == "auto"
         assert initial.json()["inference_device_active"] in {"cpu", "cuda"}
         assert initial.json()["match_margin_threshold"] == 0.03
@@ -52,6 +56,10 @@ def test_get_and_update_config(monkeypatch, tmp_path):
             "multi_camera_cycle_budget_seconds": 2,
             "network_camera_retry_base_seconds": 1.5,
             "network_camera_retry_max_seconds": 12,
+            "unstable_source_failure_threshold": 4,
+            "unstable_source_cycle_skip": 2,
+            "hls_proxy_max_sessions": 3,
+            "hls_proxy_idle_ttl_seconds": 45,
             "enroll_frames_count": 8,
             "face_crop_padding_ratio": 0.25,
             "inference_device_preference": "cpu",

@@ -56,14 +56,31 @@ class NetworkCameraWorker:
                 return None
             return self._latest_frame.copy()
 
+    def has_recent_frame(self, max_age_seconds: float | None, now: float | None = None) -> bool:
+        if max_age_seconds is None:
+            with self._frame_lock:
+                return self._latest_frame is not None
+        with self._frame_lock:
+            latest_frame_at = self._latest_frame_at
+        if latest_frame_at is None:
+            return False
+        reference_now = now if now is not None else time.time()
+        return (reference_now - latest_frame_at) <= max_age_seconds
+
     def stats(self) -> dict[str, object]:
         with self._frame_lock:
             latest_frame_at = self._latest_frame_at
+        latest_frame_age_seconds = None
+        if latest_frame_at is not None:
+            latest_frame_age_seconds = max(0.0, time.time() - latest_frame_at)
         return {
             "source": self.source,
             "is_running": bool(self._thread and self._thread.is_alive()),
             "has_frame": latest_frame_at is not None,
             "latest_frame_at": latest_frame_at,
+            "latest_frame_age_seconds": round(latest_frame_age_seconds, 3)
+            if latest_frame_age_seconds is not None
+            else None,
             "last_detection_at": get_source_annotations_updated_at(self.source),
             "last_error": self._last_error,
             "consecutive_failures": self._consecutive_failures,
@@ -222,15 +239,25 @@ class NetworkCameraPool:
                 self._workers[source] = worker
                 log_camera_event(source, "start", "Source added to runtime")
 
-    def collect_frames(self) -> list[tuple[str, object]]:
+    def collect_frames(
+        self,
+        max_frame_age_seconds: float | None = None,
+    ) -> tuple[list[tuple[str, object]], int]:
         with self._lock:
             items = list(self._workers.items())
         frames: list[tuple[str, object]] = []
+        skipped_stale = 0
+        now = time.time()
         for source, worker in items:
+            if not worker.has_recent_frame(max_frame_age_seconds, now=now):
+                skipped_stale += 1
+                continue
             frame = worker.get_latest_frame()
             if frame is not None:
                 frames.append((source, frame))
-        return frames
+            else:
+                skipped_stale += 1
+        return frames, skipped_stale
 
     def get_frame_for_source(self, source: str):
         with self._lock:
@@ -278,8 +305,10 @@ def sync_network_camera_sources(
     )
 
 
-def collect_network_camera_frames() -> list[tuple[str, object]]:
-    return network_camera_pool.collect_frames()
+def collect_network_camera_frames(
+    max_frame_age_seconds: float | None = None,
+) -> tuple[list[tuple[str, object]], int]:
+    return network_camera_pool.collect_frames(max_frame_age_seconds=max_frame_age_seconds)
 
 
 def stop_network_camera_pool() -> None:

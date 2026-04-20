@@ -362,10 +362,111 @@ Realise:
 - Ajout d'un `uptime_seconds` pour diagnostiquer une session qui demarre puis tombe vite
 - Couverture unitaire du calcul de statut et verification d'integration sur l'endpoint sessions
 
+30. `[fait]` Etendre les tests frontend aux composants de monitoring/config
+Fichiers:
+- `frontend/src/components/ConfigPanel.test.jsx`
+- `frontend/src/components/MonitoringFeedGrid.test.jsx`
+- `frontend/src/components/MonitoringMainFeed.test.jsx`
+
+Realise:
+- Validation du flux d'ajout de source reseau et de la validation profil camera dans `ConfigPanel`
+- Validation de la selection et de la suppression d'un flux secondaire dans `MonitoringFeedGrid`
+- Validation des transitions d'etat visuel du flux principal dans `MonitoringMainFeed`
+- Couverture frontend portee a 12 tests via `Vitest` et `Testing Library`
+
+31. `[fait]` Continuer le durcissement des flux cameras sur les chemins HLS et FFmpeg
+Fichiers:
+- `backend/app/services/hls_gateway_service.py`
+- `backend/app/api/routes/cameras.py`
+- `backend/tests/unit/test_hls_gateway_service.py`
+- `backend/tests/integration/test_cameras_api.py`
+
+Realise:
+- Le proxy HLS refuse desormais toute source non `rtsp://`
+- Le service des assets HLS n'accepte plus que `index.m3u8` et les segments `seg-*.ts`
+- Validation stricte du format d'identifiant de session HLS
+- Nettoyage du repertoire de session lors de l'arret pour eviter les segments orphelins exposes
+- Ajout de `-nostdin` au lancement FFmpeg pour reduire les interactions non necessaires
+
+32. `[fait]` Ajouter une doc dediee aux modes camera reseau supportes
+Fichiers:
+- `MODES_CAMERA_RESEAU.md`
+- `README.md`
+- `SECURITE.md`
+
+Realise:
+- Documentation centralisee des modes `RTSP`, `MJPEG`, `HTTP`, `HLS`
+- Clarification du choix entre playback direct navigateur et proxy HLS backend
+- Rappel des garde-fous de validation, retry reseau et limitations actuelles
+- Alignement de la doc generale et securite avec cette nouvelle reference
+
+33. `[fait]` Optimiser la boucle de detection pour reduire les cycles sans resultat utile
+Fichiers:
+- `backend/app/services/detection_loop.py`
+- `backend/app/services/recognition_service.py`
+- `backend/tests/unit/test_recognition_unknown.py`
+
+Realise:
+- Mutualisation de la lecture config pour reconnaitre plusieurs visages d'une meme frame
+- Reconnaissance par lot pour eviter une relecture config par visage
+- Suppression des ecritures SQLite vides quand aucune face n'a ete detectee sur un cycle
+- Conservation du statut `inconnu` quand une detection negative explicite est reellement produite
+
+34. `[fait]` Reduire le cout de lecture multi-flux reseau quand certaines sources sont inactives
+Fichiers:
+- `backend/app/services/network_camera_pool_service.py`
+- `backend/app/services/detection_loop.py`
+- `backend/tests/unit/test_network_camera_backoff.py`
+- `backend/tests/integration/test_recognition_preview_api.py`
+
+Realise:
+- Filtrage des frames reseau trop anciennes avant traitement dans la boucle de detection
+- Exposition de `latest_frame_age_seconds` sur les flux reseau pour diagnostiquer les sources stale
+- Ajout de `skipped_stale_sources` dans les metriques runtime de loop
+- Separation des temps `decode_ms`, `extract_ms`, `matching_ms` et conservation de `db_ms`
+
+35. `[fait]` Revoir la charge du playback HLS si plusieurs sessions sont ouvertes en parallele
+Fichiers:
+- `backend/app/services/hls_gateway_service.py`
+- `backend/app/api/routes/cameras.py`
+- `backend/app/services/config_service.py`
+- `backend/app/core/database.py`
+
+Realise:
+- Ajout de `hls_proxy_max_sessions` pour limiter les sessions FFmpeg paralleles
+- Ajout de `hls_proxy_idle_ttl_seconds` pour expirer les sessions HLS inactives
+- Eviction LRU des sessions HLS les moins recentes quand la limite est atteinte
+- Application du TTL sur listing, reutilisation et service des assets HLS
+
+36. `[fait]` Evaluer un echantillonnage adaptatif des flux les plus instables
+Fichiers:
+- `backend/app/services/detection_loop.py`
+- `backend/app/services/config_service.py`
+- `backend/app/core/database.py`
+- `frontend/src/components/ConfigGeneralSettings.jsx`
+
+Realise:
+- Ajout de `unstable_source_failure_threshold` et `unstable_source_cycle_skip`
+- Sous-echantillonnage des flux reseau avec echecs consecutifs eleves
+- Ajout de `skipped_unstable_sources` dans les metriques runtime
+- Parametres exposes dans l'UI, persistes en base et pris en compte a chaud
+
+37. `[fait]` Ajouter une vue UI des metriques runtime detaillees pour verifier les gains en exploitation
+Fichiers:
+- `frontend/src/components/MonitoringRuntimeMetricsPanel.jsx`
+- `frontend/src/components/MonitoringPanel.jsx`
+- `frontend/src/app.css`
+
+Realise:
+- Ajout d'un panneau UI lisible pour les temps `capture`, `decode`, `extract`, `matching`, `db` et `cycle`
+- Ajout des compteurs `processed_sources`, `results_count`, `skipped_stale_sources`, `skipped_unstable_sources`
+- Mise en avant des sources reseau degradees avec age de frame, retry, echecs consecutifs et erreur courante
+- Remplacement du dump JSON brut du loop runtime par une vue exploitable en monitoring live
+
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Etendre les tests frontend aux composants de monitoring/config
-2. Continuer le durcissement des flux cameras sur les chemins HLS et FFmpeg
-3. Ajouter une doc dediee aux modes camera reseau supportes
-4. Ajouter une vue UI des statuts HLS si le diagnostic doit etre accessible sans API
+1. Continuer le durcissement FFmpeg sur les erreurs transitoires et la gestion des timeouts
+2. Ajouter des alertes de saturation HLS quand la limite de sessions est atteinte
+3. Etendre les tests UI au parcours playback camera et metriques detaillees
+4. Evaluer un affichage compact de l'historique perf sur plusieurs cycles

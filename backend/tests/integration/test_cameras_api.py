@@ -162,7 +162,9 @@ def test_playback_start_direct_and_proxy(monkeypatch, tmp_path):
 
         monkeypatch.setattr(
             "app.api.routes.cameras.start_hls_session",
-            lambda profile_name, source_url: {"id": "sess-123"},
+            lambda profile_name, source_url, max_sessions, idle_ttl_seconds: {
+                "id": "sess-123"
+            },
         )
         proxy = client.post("/api/cameras/playback/start?profile_name=RTSP%20Cam")
         assert proxy.status_code == 200
@@ -184,7 +186,7 @@ def test_playback_sessions_expose_hls_observability(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         "app.api.routes.cameras.list_hls_sessions",
-        lambda: [
+        lambda idle_ttl_seconds: [
             {
                 "id": "sess-ready",
                 "profile_name": "RTSP ready",
@@ -226,3 +228,66 @@ def test_playback_sessions_expose_hls_observability(monkeypatch, tmp_path):
         assert sessions[1]["running"] is False
         assert sessions[1]["last_exit_code"] == 1
         assert sessions[1]["last_error"] == "Connection refused"
+
+
+def test_hls_asset_endpoint_rejects_unexpected_asset_name(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
+    app = create_app()
+
+    monkeypatch.setattr(
+        "app.api.routes.cameras.resolve_hls_file",
+        lambda session_id, filename, idle_ttl_seconds=30.0: None,
+    )
+
+    with TestClient(app) as client:
+        login(client)
+        response = client.get("/api/cameras/hls/abc123def456/playlist.m3u8")
+        assert response.status_code == 404
+
+
+def test_playback_start_returns_503_on_invalid_proxy_source(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
+    app = create_app()
+
+    with TestClient(app) as client:
+        login(client)
+        config_payload = {
+            "detection_interval_seconds": 3,
+            "match_threshold": 0.6,
+            "camera_index": 0,
+            "camera_source": "",
+            "network_camera_sources": [],
+            "network_camera_profiles": [
+                {
+                    "name": "RTSP Cam",
+                    "protocol": "rtsp",
+                    "host": "192.168.1.44",
+                    "port": 554,
+                    "path": "/stream1",
+                    "username": "admin",
+                    "password": "admin",
+                    "onvif_url": "",
+                    "enabled": True,
+                },
+            ],
+            "multi_camera_cycle_budget_seconds": 2,
+            "enroll_frames_count": 5,
+            "face_crop_padding_ratio": 0.2,
+            "inference_device_preference": "auto",
+            "production_api_rate_limit_window_seconds": 60,
+            "production_api_rate_limit_max_requests": 30,
+        }
+        client.put("/api/config", json=config_payload)
+        monkeypatch.setattr(
+            "app.api.routes.cameras.start_hls_session",
+            lambda profile_name, source_url, max_sessions, idle_ttl_seconds: (_ for _ in ()).throw(
+                ValueError("Le proxy HLS accepte uniquement les flux RTSP")
+            ),
+        )
+
+        response = client.post("/api/cameras/playback/start?profile_name=RTSP%20Cam")
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Le proxy HLS accepte uniquement les flux RTSP"

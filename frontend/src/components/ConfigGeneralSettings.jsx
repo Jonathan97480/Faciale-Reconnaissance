@@ -100,6 +100,58 @@ export default function ConfigGeneralSettings({ draft, onChange }) {
           />
         </label>
         <label>
+          Seuil flux instable (echecs)
+          <input
+            type="number"
+            min="1"
+            max="50"
+            step="1"
+            value={draft.unstable_source_failure_threshold ?? 3}
+            onChange={(event) =>
+              onChange("unstable_source_failure_threshold", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          Cycles sautes si flux instable
+          <input
+            type="number"
+            min="0"
+            max="10"
+            step="1"
+            value={draft.unstable_source_cycle_skip ?? 1}
+            onChange={(event) =>
+              onChange("unstable_source_cycle_skip", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          Max sessions HLS proxy
+          <input
+            type="number"
+            min="1"
+            max="10"
+            step="1"
+            value={draft.hls_proxy_max_sessions ?? 2}
+            onChange={(event) =>
+              onChange("hls_proxy_max_sessions", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          TTL session HLS idle (secondes)
+          <input
+            type="number"
+            min="5"
+            max="600"
+            step="1"
+            value={draft.hls_proxy_idle_ttl_seconds ?? 30}
+            onChange={(event) =>
+              onChange("hls_proxy_idle_ttl_seconds", event.target.value)
+            }
+          />
+        </label>
+        <label>
           Nombre de frames d&apos;enrolement
           <input
             type="number"

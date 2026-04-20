@@ -5,6 +5,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from app.core.database import get_db_path
 from app.services.network_url_validation_service import validate_network_stream_url
@@ -12,18 +13,74 @@ from app.services.network_url_validation_service import validate_network_stream_
 
 class HlsSessionManager:
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._sessions_by_profile: dict[str, dict[str, object]] = {}
         self._sessions_by_id: dict[str, dict[str, object]] = {}
 
     def _base_dir(self) -> Path:
         return get_db_path().parent / "hls_gateway"
 
-    def _build_cmd(self, source_url: str, manifest_path: Path) -> list[str]:
+    def _validate_gateway_source_url(self, source_url: str) -> str:
         validated_source_url = validate_network_stream_url(source_url)
+        parts = urlsplit(validated_source_url)
+        if parts.scheme.lower() != "rtsp":
+            raise ValueError("Le proxy HLS accepte uniquement les flux RTSP")
+        return validated_source_url
+
+    def _validate_session_id(self, session_id: str) -> str:
+        cleaned = session_id.strip()
+        if len(cleaned) != 12 or any(char not in "0123456789abcdef" for char in cleaned):
+            raise ValueError("Identifiant de session HLS invalide")
+        return cleaned
+
+    def _validate_asset_name(self, filename: str) -> str:
+        cleaned = filename.strip()
+        if not cleaned:
+            raise ValueError("Nom de fichier HLS requis")
+        candidate = Path(cleaned)
+        if candidate.name != cleaned or candidate.is_absolute():
+            raise ValueError("Nom de fichier HLS invalide")
+        if cleaned == "index.m3u8":
+            return cleaned
+        if cleaned.startswith("seg-") and cleaned.endswith(".ts"):
+            return cleaned
+        raise ValueError("Asset HLS non supporte")
+
+    def _collect_expired_session_ids(self, idle_ttl_seconds: float, now: float) -> list[str]:
+        expired_ids: list[str] = []
+        for session_id, session in self._sessions_by_id.items():
+            last_used_at = float(session.get("last_used_at") or 0.0)
+            if (now - last_used_at) >= idle_ttl_seconds:
+                expired_ids.append(session_id)
+        return expired_ids
+
+    def _collect_lru_session_ids(self) -> list[str]:
+        ordered = sorted(
+            self._sessions_by_id.values(),
+            key=lambda session: float(session.get("last_used_at") or 0.0),
+        )
+        return [str(session["id"]) for session in ordered]
+
+    def _prune_sessions(
+        self,
+        max_sessions: int | None,
+        idle_ttl_seconds: float,
+    ) -> None:
+        now = time.time()
+        for session_id in self._collect_expired_session_ids(idle_ttl_seconds, now):
+            self.stop_session(session_id)
+        while max_sessions is not None and len(self._sessions_by_id) >= max_sessions:
+            lru_ids = self._collect_lru_session_ids()
+            if not lru_ids:
+                break
+            self.stop_session(lru_ids[0])
+
+    def _build_cmd(self, source_url: str, manifest_path: Path) -> list[str]:
+        validated_source_url = self._validate_gateway_source_url(source_url)
         return [
             "ffmpeg",
             "-hide_banner",
+            "-nostdin",
             "-loglevel",
             "error",
             "-rtsp_transport",
@@ -114,8 +171,15 @@ class HlsSessionManager:
             "uptime_seconds": max(0.0, now - started_at),
         }
 
-    def start_or_get_session(self, profile_name: str, source_url: str) -> dict[str, object]:
+    def start_or_get_session(
+        self,
+        profile_name: str,
+        source_url: str,
+        max_sessions: int = 2,
+        idle_ttl_seconds: float = 30.0,
+    ) -> dict[str, object]:
         with self._lock:
+            self._prune_sessions(max_sessions=max_sessions, idle_ttl_seconds=idle_ttl_seconds)
             existing = self._sessions_by_profile.get(profile_name)
             if existing and self._is_running(existing):
                 existing["last_used_at"] = time.time()
@@ -151,16 +215,18 @@ class HlsSessionManager:
             self._sessions_by_id[session_id] = session
             return self._session_status(session)
 
-    def get_session(self, session_id: str) -> dict[str, object] | None:
+    def get_session(self, session_id: str, idle_ttl_seconds: float = 30.0) -> dict[str, object] | None:
         with self._lock:
+            self._prune_sessions(max_sessions=None, idle_ttl_seconds=idle_ttl_seconds)
             session = self._sessions_by_id.get(session_id)
             if not session:
                 return None
             session["last_used_at"] = time.time()
             return self._session_status(session)
 
-    def list_sessions(self) -> list[dict[str, object]]:
+    def list_sessions(self, idle_ttl_seconds: float = 30.0) -> list[dict[str, object]]:
         with self._lock:
+            self._prune_sessions(max_sessions=None, idle_ttl_seconds=idle_ttl_seconds)
             items = list(self._sessions_by_id.values())
         return [self._session_status(session) for session in items]
 
@@ -179,6 +245,8 @@ class HlsSessionManager:
                 process.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 process.kill()
+        session_dir = Path(str(session["dir"]))
+        shutil.rmtree(session_dir, ignore_errors=True)
         return True
 
     def stop_all(self) -> None:
@@ -189,16 +257,26 @@ class HlsSessionManager:
 hls_gateway_manager = HlsSessionManager()
 
 
-def start_hls_session(profile_name: str, source_url: str) -> dict[str, object]:
-    return hls_gateway_manager.start_or_get_session(profile_name, source_url)
+def start_hls_session(
+    profile_name: str,
+    source_url: str,
+    max_sessions: int = 2,
+    idle_ttl_seconds: float = 30.0,
+) -> dict[str, object]:
+    return hls_gateway_manager.start_or_get_session(
+        profile_name,
+        source_url,
+        max_sessions=max_sessions,
+        idle_ttl_seconds=idle_ttl_seconds,
+    )
 
 
-def get_hls_session(session_id: str) -> dict[str, object] | None:
-    return hls_gateway_manager.get_session(session_id)
+def get_hls_session(session_id: str, idle_ttl_seconds: float = 30.0) -> dict[str, object] | None:
+    return hls_gateway_manager.get_session(session_id, idle_ttl_seconds=idle_ttl_seconds)
 
 
-def list_hls_sessions() -> list[dict[str, object]]:
-    return hls_gateway_manager.list_sessions()
+def list_hls_sessions(idle_ttl_seconds: float = 30.0) -> list[dict[str, object]]:
+    return hls_gateway_manager.list_sessions(idle_ttl_seconds=idle_ttl_seconds)
 
 
 def stop_hls_session(session_id: str) -> bool:
@@ -209,13 +287,25 @@ def stop_all_hls_sessions() -> None:
     hls_gateway_manager.stop_all()
 
 
-def resolve_hls_file(session_id: str, filename: str) -> Path | None:
-    session = get_hls_session(session_id)
+def resolve_hls_file(
+    session_id: str,
+    filename: str,
+    idle_ttl_seconds: float = 30.0,
+) -> Path | None:
+    try:
+        safe_session_id = hls_gateway_manager._validate_session_id(session_id)
+        safe_filename = hls_gateway_manager._validate_asset_name(filename)
+    except ValueError:
+        return None
+
+    session = get_hls_session(safe_session_id, idle_ttl_seconds=idle_ttl_seconds)
     if not session:
         return None
     session_dir = Path(str(session["dir"])).resolve()
-    target = (session_dir / filename).resolve()
-    if not str(target).startswith(str(session_dir)):
+    target = (session_dir / safe_filename).resolve()
+    try:
+        target.relative_to(session_dir)
+    except ValueError:
         return None
     if not os.path.exists(target):
         return None

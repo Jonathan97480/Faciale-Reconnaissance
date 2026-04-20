@@ -93,6 +93,18 @@ Rate limiting:
 - utiliser `backend/requirements.txt` pour le runtime
 - utiliser `backend/requirements-dev.txt` uniquement pour le dev/test
 
+## 9. Flux camera reseau
+
+Regles specifiques:
+
+- les routes `/api/cameras/*` restent reservees aux sessions admin
+- les URLs camera reseau sont validees avant envoi aux workers ou a FFmpeg
+- le proxy HLS backend n'accepte que des sources `rtsp://`
+- seuls `index.m3u8` et les segments `seg-*.ts` sont servis par le backend
+- les repertoires de session HLS sont nettoyes a l'arret
+
+Voir aussi [MODES_CAMERA_RESEAU.md](MODES_CAMERA_RESEAU.md).
+
 ---
 
 Voir aussi `AGENTS.md`, `README.md` et `AUDIT.md`.

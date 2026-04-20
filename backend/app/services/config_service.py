@@ -102,6 +102,14 @@ def _load_config_from_db(connection) -> ConfigPayload:
         network_camera_retry_max_seconds=float(
             raw_config.get("network_camera_retry_max_seconds", "8")
         ),
+        unstable_source_failure_threshold=int(
+            raw_config.get("unstable_source_failure_threshold", "3")
+        ),
+        unstable_source_cycle_skip=int(raw_config.get("unstable_source_cycle_skip", "1")),
+        hls_proxy_max_sessions=int(raw_config.get("hls_proxy_max_sessions", "2")),
+        hls_proxy_idle_ttl_seconds=float(
+            raw_config.get("hls_proxy_idle_ttl_seconds", "30")
+        ),
         enroll_frames_count=int(raw_config.get("enroll_frames_count", "5")),
         face_crop_padding_ratio=float(raw_config.get("face_crop_padding_ratio", "0.2")),
         inference_device_preference=preference,
@@ -195,6 +203,10 @@ def update_config(payload: ConfigPayload) -> ConfigPayload:
         "multi_camera_cycle_budget_seconds": str(payload.multi_camera_cycle_budget_seconds),
         "network_camera_retry_base_seconds": str(payload.network_camera_retry_base_seconds),
         "network_camera_retry_max_seconds": str(payload.network_camera_retry_max_seconds),
+        "unstable_source_failure_threshold": str(payload.unstable_source_failure_threshold),
+        "unstable_source_cycle_skip": str(payload.unstable_source_cycle_skip),
+        "hls_proxy_max_sessions": str(payload.hls_proxy_max_sessions),
+        "hls_proxy_idle_ttl_seconds": str(payload.hls_proxy_idle_ttl_seconds),
         "enroll_frames_count": str(payload.enroll_frames_count),
         "face_crop_padding_ratio": str(payload.face_crop_padding_ratio),
         "inference_device_preference": str(payload.inference_device_preference),
