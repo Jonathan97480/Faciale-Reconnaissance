@@ -49,3 +49,29 @@ def test_preview_stream_returns_mjpeg(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("multipart/x-mixed-replace")
     assert b"--frame" in response.content
+
+
+def test_loop_status_includes_performance_metrics(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
+
+    with TestClient(create_app()) as client:
+        login(client)
+        response = client.get("/api/recognition/loop/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "loop" in payload
+    assert "performance" in payload["loop"]
+    performance = payload["loop"]["performance"]
+    assert set(performance).issuperset(
+        {
+            "capture_ms",
+            "inference_ms",
+            "db_ms",
+            "cycle_ms",
+            "processed_sources",
+            "results_count",
+            "updated_at",
+        }
+    )

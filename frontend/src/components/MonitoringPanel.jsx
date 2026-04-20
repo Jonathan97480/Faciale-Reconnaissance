@@ -2,6 +2,45 @@ import { useEffect, useRef, useState } from "react";
 
 import { apiClient } from "../api/client";
 import { useConfig } from "../context/ConfigContext";
+import MonitoringFeedGrid from "./MonitoringFeedGrid";
+import MonitoringHistoryPanel from "./MonitoringHistoryPanel";
+import MonitoringImageAnalysisPanel from "./MonitoringImageAnalysisPanel";
+import MonitoringMainFeed from "./MonitoringMainFeed";
+
+function buildConfigPayload(state) {
+  return {
+    detection_interval_seconds: Number(state?.detection_interval_seconds ?? 3),
+    match_threshold: Number(state?.match_threshold ?? 0.6),
+    camera_index: Number(state?.camera_index ?? 0),
+    camera_source: String(state?.camera_source ?? ""),
+    network_camera_sources: (state?.network_camera_sources ?? [])
+      .map((source) => String(source).trim())
+      .filter((source, index, arr) => source && arr.indexOf(source) === index)
+      .slice(0, 10),
+    network_camera_profiles: (state?.network_camera_profiles ?? [])
+      .map((profile) => ({
+        ...profile,
+        name: String(profile.name ?? "").trim(),
+        host: String(profile.host ?? "").trim(),
+        path: String(profile.path ?? "/"),
+        username: String(profile.username ?? ""),
+        password: String(profile.password ?? ""),
+        onvif_url: String(profile.onvif_url ?? ""),
+        port: Number(profile.port ?? 554),
+        enabled: Boolean(profile.enabled),
+      }))
+      .filter((profile) => profile.name && profile.host)
+      .slice(0, 10),
+    multi_camera_cycle_budget_seconds: Number(state?.multi_camera_cycle_budget_seconds ?? 2),
+    enroll_frames_count: Number(state?.enroll_frames_count ?? 5),
+    face_crop_padding_ratio: Number(state?.face_crop_padding_ratio ?? 0.2),
+    inference_device_preference: String(state?.inference_device_preference ?? "auto"),
+  };
+}
+
+function formatDetectionScore(score) {
+  return typeof score === "number" ? `${(score * 100).toFixed(1)}%` : "--";
+}
 
 export default function MonitoringPanel() {
   const { config } = useConfig();
@@ -56,34 +95,12 @@ export default function MonitoringPanel() {
     }
   };
 
-  const buildConfigPayload = (state) => ({
-    detection_interval_seconds: Number(state?.detection_interval_seconds ?? 3),
-    match_threshold: Number(state?.match_threshold ?? 0.6),
-    camera_index: Number(state?.camera_index ?? 0),
-    camera_source: String(state?.camera_source ?? ""),
-    network_camera_sources: (state?.network_camera_sources ?? [])
-      .map((source) => String(source).trim())
-      .filter((source, index, arr) => source && arr.indexOf(source) === index)
-      .slice(0, 10),
-    network_camera_profiles: (state?.network_camera_profiles ?? [])
-      .map((profile) => ({
-        ...profile,
-        name: String(profile.name ?? "").trim(),
-        host: String(profile.host ?? "").trim(),
-        path: String(profile.path ?? "/"),
-        username: String(profile.username ?? ""),
-        password: String(profile.password ?? ""),
-        onvif_url: String(profile.onvif_url ?? ""),
-        port: Number(profile.port ?? 554),
-        enabled: Boolean(profile.enabled),
-      }))
-      .filter((profile) => profile.name && profile.host)
-      .slice(0, 10),
-    multi_camera_cycle_budget_seconds: Number(state?.multi_camera_cycle_budget_seconds ?? 2),
-    enroll_frames_count: Number(state?.enroll_frames_count ?? 5),
-    face_crop_padding_ratio: Number(state?.face_crop_padding_ratio ?? 0.2),
-    inference_device_preference: String(state?.inference_device_preference ?? "auto"),
-  });
+  const refreshAll = async () => {
+    await refreshLoopState();
+    await refreshLatestDetection();
+    await refreshHistory();
+    await refreshCameraAlerts();
+  };
 
   const removeNetworkFeed = async (sourceToRemove) => {
     setStatus("Suppression du flux reseau...");
@@ -98,24 +115,14 @@ export default function MonitoringPanel() {
       await apiClient.updateConfig(buildConfigPayload(next));
       await refreshLoopState();
       setStatus(`Flux reseau supprime: ${sourceToRemove}`);
-    } catch (err) {
+    } catch {
       setStatus("Echec suppression flux reseau.");
     }
   };
 
   useEffect(() => {
-    refreshLoopState();
-    refreshLatestDetection();
-    refreshHistory();
-    refreshCameraAlerts();
-
-    const timer = setInterval(() => {
-      refreshLoopState();
-      refreshLatestDetection();
-      refreshHistory();
-      refreshCameraAlerts();
-    }, 3000);
-
+    refreshAll();
+    const timer = setInterval(refreshAll, 3000);
     return () => clearInterval(timer);
   }, []);
 
@@ -172,8 +179,7 @@ export default function MonitoringPanel() {
 
   const detectedFaces = latestDetection?.faces ?? [];
   const hasUnknownFace = detectedFaces.some((face) => face.status === "inconnu");
-  const networkSources =
-    config?.network_camera_sources ?? [];
+  const networkSources = config?.network_camera_sources ?? [];
   const sourceRuntimeMap = Object.fromEntries(
     (loopState?.network_cameras?.sources ?? []).map((item) => [item.source, item])
   );
@@ -215,55 +221,25 @@ export default function MonitoringPanel() {
         </div>
       )}
       <h2>Monitoring</h2>
-      <div className={`stream-wrap ${isFullscreen ? "fullscreen" : ""}`} ref={streamWrapRef}>
-        {useNetworkVideoElement ? (
-          <video
-            src={currentMainFeed.source}
-            autoPlay
-            playsInline
-            muted={!audioEnabled}
-            onError={() => {
-              setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: false }));
-              setAudioEnabled(false);
-              setCameraStatus(
-                `Audio non supporte par ce flux (${currentMainFeed.label}). Retour en mode preview.`
-              );
-            }}
-            onLoadedData={() => {
-              setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: true }));
-              setCameraStatus(`Flux principal actif (${currentMainFeed.label}).`);
-            }}
-          />
-        ) : (
-          <img
-            src={mainFeedUrl}
-            alt={`Apercu ${currentMainFeed.label}`}
-            onError={() => {
-              setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: false }));
-              setCameraStatus(`Flux principal indisponible (${currentMainFeed.label}).`);
-            }}
-            onLoad={() => {
-              setFeedStatus((prev) => ({ ...prev, [currentMainFeed.key]: true }));
-              setCameraStatus(`Flux principal actif (${currentMainFeed.label}).`);
-            }}
-          />
-        )}
-        <div className="hud-overlay">
-          <div className="hud-corners" />
-          <div className="hud-topline">TACTICAL IDENT / {currentMainFeed.label.toUpperCase()}</div>
-          <div className="hud-meta">
-            <span>FACES: {detectedFaces.length}</span>
-            <span>LOOP: {loopState?.loop?.running ? "RUNNING" : "STOPPED"}</span>
-            <span>UNKNOWN: {hasUnknownFace ? "YES" : "NO"}</span>
-          </div>
-        </div>
-      </div>
+
+      <MonitoringMainFeed
+        currentMainFeed={currentMainFeed}
+        detectedFaces={detectedFaces}
+        hasUnknownFace={hasUnknownFace}
+        isFullscreen={isFullscreen}
+        loopRunning={loopState?.loop?.running}
+        mainFeedUrl={mainFeedUrl}
+        setAudioEnabled={setAudioEnabled}
+        setCameraStatus={setCameraStatus}
+        setFeedStatus={setFeedStatus}
+        streamWrapRef={streamWrapRef}
+        useNetworkVideoElement={useNetworkVideoElement}
+      />
+
       <p className={`status-line ${cameraStatus.includes("actif") ? "ok" : "warn"}`}>{cameraStatus}</p>
-      <section className="history-panel">
-        <h3>Alertes camera</h3>
-        {cameraAlerts.length === 0 && (
-          <p className="status-line ok">Aucune alerte camera.</p>
-        )}
+
+      <MonitoringHistoryPanel title="Alertes camera">
+        {cameraAlerts.length === 0 && <p className="status-line ok">Aucune alerte camera.</p>}
         {cameraAlerts.length > 0 && (
           <ul className="history-list">
             {cameraAlerts.slice(0, 10).map((alert, index) => (
@@ -275,88 +251,19 @@ export default function MonitoringPanel() {
             ))}
           </ul>
         )}
-      </section>
-      <section className="history-panel">
-        <h3>Grille des flux configures</h3>
-        {sideFeeds.length === 0 && (
-          <p className="status-line">Aucun flux secondaire disponible.</p>
-        )}
-        {sideFeeds.length > 0 && (
-          <div className="stream-grid">
-            {sideFeeds.map((feed) => {
-              const runtime = feed.type === "network" ? sourceRuntimeMap[feed.source] : null;
-              const streamIsOk =
-                feed.type === "network"
-                  ? Boolean(runtime?.has_frame) && !runtime?.last_error
-                  : feedStatus[feed.key] !== false;
-              const feedUrl =
-                feed.type === "local"
-                  ? apiClient.getRecognitionPreviewStreamUrl()
-                  : apiClient.getNetworkPreviewStreamUrl(feed.source);
-              return (
-                <article
-                  key={feed.key}
-                  className="stream-card"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setMainFeedKey(feed.key)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      setMainFeedKey(feed.key);
-                    }
-                  }}
-                >
-                  <div className="stream-card-head">
-                    <strong>{feed.label}</strong>
-                    <span className={`badge ${streamIsOk ? "ok" : "warn"}`}>
-                      {streamIsOk ? "actif" : "indisponible"}
-                    </span>
-                  </div>
-                  {feed.type === "network" && (
-                    <div className="button-row" style={{ marginTop: 6 }}>
-                      <button
-                        type="button"
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                        }}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          removeNetworkFeed(feed.source);
-                        }}
-                      >
-                        Supprimer flux
-                      </button>
-                    </div>
-                  )}
-                  <p className="stream-source">{feed.type === "local" ? "camera locale" : feed.source}</p>
-                  {feed.type === "network" && runtime && (
-                    <p className="stream-source">
-                      {runtime.last_error
-                        ? `Erreur: ${runtime.last_error}`
-                        : runtime.has_frame
-                          ? `OK | read=${runtime.last_read_duration_ms}ms`
-                          : "Initialisation flux..."}
-                    </p>
-                  )}
-                  <div className="stream-mini-wrap">
-                    <img
-                      src={feedUrl}
-                      alt={`Apercu ${feed.label}`}
-                      onLoad={() =>
-                        setFeedStatus((prev) => ({ ...prev, [feed.key]: true }))
-                      }
-                      onError={() =>
-                        setFeedStatus((prev) => ({ ...prev, [feed.key]: false }))
-                      }
-                    />
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
+      </MonitoringHistoryPanel>
+
+      <MonitoringHistoryPanel title="Grille des flux configures">
+        <MonitoringFeedGrid
+          feedStatus={feedStatus}
+          removeNetworkFeed={removeNetworkFeed}
+          setFeedStatus={setFeedStatus}
+          setMainFeedKey={setMainFeedKey}
+          sideFeeds={sideFeeds}
+          sourceRuntimeMap={sourceRuntimeMap}
+        />
+      </MonitoringHistoryPanel>
+
       <div className="button-row">
         <button onClick={runCheck}>Lancer verification manuelle</button>
         {currentMainFeed.type === "network" && (
@@ -364,69 +271,29 @@ export default function MonitoringPanel() {
             {audioEnabled ? "Couper son" : "Activer son"}
           </button>
         )}
-        <button onClick={toggleFullscreen}>{isFullscreen ? "Quitter plein ecran" : "Plein ecran HUD"}</button>
-        <button
-          onClick={async () => {
-            await refreshLoopState();
-            await refreshLatestDetection();
-            await refreshHistory();
-            await refreshCameraAlerts();
-          }}
-        >
-          Rafraichir etat loop
+        <button onClick={toggleFullscreen}>
+          {isFullscreen ? "Quitter plein ecran" : "Plein ecran HUD"}
         </button>
+        <button onClick={refreshAll}>Rafraichir etat loop</button>
       </div>
+
       <p className="status-line">{status}</p>
-      <section className="history-panel">
-        <h3>Analyse d'image (API)</h3>
-        <div className="button-row">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(event) => setSelectedImage(event.target.files?.[0] ?? null)}
-          />
-          <button onClick={runImageAnalysis}>Analyser image</button>
-        </div>
-        {imageAnalysis?.faces?.length > 0 && (
-          <div className="crop-grid">
-            {imageAnalysis.faces.map((face, index) => (
-              <article key={`crop-${index}`} className="crop-card">
-                {face.face_image_base64 ? (
-                  <img
-                    src={`data:image/jpeg;base64,${face.face_image_base64}`}
-                    alt={`Visage detecte ${index + 1}`}
-                  />
-                ) : (
-                  <div className="crop-missing">Crop indisponible</div>
-                )}
-                <div>
-                  <strong>{face.face_name || `Inconnu #${index + 1}`}</strong>
-                  <div>Statut: {face.status}</div>
-                  <div>
-                    Score: {typeof face.score === "number" ? `${(face.score * 100).toFixed(1)}%` : "--"}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-        {imageAnalysis && (
-          <pre className="block-json">{JSON.stringify(imageAnalysis, null, 2)}</pre>
-        )}
-      </section>
+
+      <MonitoringImageAnalysisPanel
+        imageAnalysis={imageAnalysis}
+        runImageAnalysis={runImageAnalysis}
+        setSelectedImage={setSelectedImage}
+      />
+
       {detectedFaces.length > 0 && (
         <ul className="face-list">
           {detectedFaces.map((face, index) => {
             const name = face.face_name || `Inconnu #${index + 1}`;
-            const score =
-              typeof face.score === "number"
-                ? `${(face.score * 100).toFixed(1)}%`
-                : "--";
             return (
               <li className="face-row" key={`${name}-${index}`}>
                 <div>
                   <strong>{name}</strong>
-                  <div>Confiance: {score}</div>
+                  <div>Confiance: {formatDetectionScore(face.score)}</div>
                 </div>
                 <span className={`badge ${face.status === "reconnu" ? "ok" : "warn"}`}>
                   {face.status}
@@ -436,8 +303,8 @@ export default function MonitoringPanel() {
           })}
         </ul>
       )}
-      <section className="history-panel">
-        <h3>Historique live (10 dernieres detections)</h3>
+
+      <MonitoringHistoryPanel title="Historique live (10 dernieres detections)">
         {history.length === 0 && <p className="status-line">Aucune detection enregistree.</p>}
         {history.length > 0 && (
           <ul className="history-list">
@@ -458,18 +325,11 @@ export default function MonitoringPanel() {
             })}
           </ul>
         )}
-      </section>
-      {loopState && (
-        <pre className="block-json">{JSON.stringify(loopState, null, 2)}</pre>
-      )}
-      {latestDetection && (
-        <pre className="block-json">
-          {JSON.stringify(latestDetection, null, 2)}
-        </pre>
-      )}
-      {result && (
-        <pre className="block-json">{JSON.stringify(result, null, 2)}</pre>
-      )}
+      </MonitoringHistoryPanel>
+
+      {loopState && <pre className="block-json">{JSON.stringify(loopState, null, 2)}</pre>}
+      {latestDetection && <pre className="block-json">{JSON.stringify(latestDetection, null, 2)}</pre>}
+      {result && <pre className="block-json">{JSON.stringify(result, null, 2)}</pre>}
     </section>
   );
 }

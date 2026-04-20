@@ -18,8 +18,18 @@ class DetectionLoop:
     def __init__(self) -> None:
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+        self._status_lock = threading.Lock()
         self._source_cursor = 0
         self._configured_device_preference: str | None = None
+        self._performance = {
+            "capture_ms": None,
+            "inference_ms": None,
+            "db_ms": None,
+            "cycle_ms": None,
+            "processed_sources": 0,
+            "results_count": 0,
+            "updated_at": None,
+        }
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -33,10 +43,28 @@ class DetectionLoop:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2)
         self._configured_device_preference = None
+        self._set_performance(
+            capture_ms=None,
+            inference_ms=None,
+            db_ms=None,
+            cycle_ms=None,
+            processed_sources=0,
+            results_count=0,
+        )
 
-    def status(self) -> dict[str, bool]:
+    def _set_performance(self, **metrics) -> None:
+        with self._status_lock:
+            self._performance = {
+                **self._performance,
+                **metrics,
+                "updated_at": time.time(),
+            }
+
+    def status(self) -> dict[str, bool | dict[str, object]]:
         running = bool(self._thread and self._thread.is_alive())
-        return {"running": running}
+        with self._status_lock:
+            performance = dict(self._performance)
+        return {"running": running, "performance": performance}
 
     @staticmethod
     def _process_frame(frame) -> tuple[list, list[tuple]]:
@@ -70,6 +98,7 @@ class DetectionLoop:
     def _run(self) -> None:
         while not self._stop_event.is_set():
             try:
+                cycle_started_at = time.monotonic()
                 config = read_config()
                 self._sync_inference_device(config.inference_device_preference)
                 profile_urls = build_enabled_profile_urls(config.network_camera_profiles)
@@ -82,23 +111,28 @@ class DetectionLoop:
                     max_sources=10,
                 )
 
+                capture_started_at = time.monotonic()
                 frame_items: list[tuple[str, object]] = []
                 primary_frame = capture_frame()
                 if primary_frame is not None:
                     frame_items.append(("local", primary_frame))
                 frame_items.extend(collect_network_camera_frames())
+                capture_ms = (time.monotonic() - capture_started_at) * 1000.0
                 ordered_items = self._ordered_frame_items(frame_items)
 
                 cycle_budget_seconds = config.multi_camera_cycle_budget_seconds
                 started_at = time.monotonic()
                 all_results = []
+                inference_ms = 0.0
 
                 processed_count = 0
                 for source, frame in ordered_items:
                     if processed_count > 0 and (time.monotonic() - started_at) >= cycle_budget_seconds:
                         break
                     try:
+                        inference_started_at = time.monotonic()
                         results, annotations = self._process_frame(frame)
+                        inference_ms += (time.monotonic() - inference_started_at) * 1000.0
                         all_results.extend(results)
                         if source:
                             set_source_annotations(source, annotations)
@@ -110,9 +144,20 @@ class DetectionLoop:
                 if frame_items:
                     self._source_cursor = (self._source_cursor + max(1, processed_count)) % len(frame_items)
 
+                db_started_at = time.monotonic()
                 save_detection(all_results)
+                db_ms = (time.monotonic() - db_started_at) * 1000.0
 
                 elapsed = time.monotonic() - started_at
+                cycle_ms = (time.monotonic() - cycle_started_at) * 1000.0
+                self._set_performance(
+                    capture_ms=round(capture_ms, 3),
+                    inference_ms=round(inference_ms, 3),
+                    db_ms=round(db_ms, 3),
+                    cycle_ms=round(cycle_ms, 3),
+                    processed_sources=processed_count,
+                    results_count=len(all_results),
+                )
                 sleep_delay = max(0.0, config.detection_interval_seconds - elapsed)
                 self._stop_event.wait(sleep_delay)
             except Exception:

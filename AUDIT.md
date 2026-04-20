@@ -103,7 +103,7 @@ Fichiers:
 - `backend/tests/integration/test_cameras_api.py`
 
 Verification:
-- `pytest` backend: `49 passed`
+- `pytest` backend: `50 passed`
 
 ### Priorite 2 - Important
 
@@ -124,9 +124,13 @@ Realise:
 - La boucle applique le device uniquement quand la preference change
 - Le cache local de preference est reinitialise en cas d'erreur runtime
 
-11. `[a faire]` Ajouter des metriques de performance
+11. `[fait]` Ajouter des metriques de performance
 Fichier:
 - `backend/app/services/detection_loop.py`
+
+Realise:
+- Mesure des temps capture, inference, DB et duree de cycle
+- Exposition des metriques dans `detection_loop.status()`
 
 12. `[fait]` Decoupler config et runtime
 Fichier:
@@ -137,9 +141,13 @@ Realise:
 - `inference_device_active` reflete l'etat runtime courant sans effet de bord
 - `update_config()` applique explicitement la nouvelle preference pour prise en compte immediate
 
-13. `[a faire]` Refactor `MonitoringPanel`
+13. `[fait]` Refactor `MonitoringPanel`
 Fichier:
 - `frontend/src/components/MonitoringPanel.jsx`
+
+Realise:
+- Extraction du flux principal, de la grille des flux, de l'historique reutilisable et du panneau d'analyse image
+- Reduction de la taille et de la complexite du composant orchestrateur
 
 14. `[a faire]` Refactor `ConfigPanel`
 Fichier:
@@ -206,6 +214,8 @@ Ce qui est effectivement termine a ce stade:
 - Decouplage lecture config / runtime inference
 - Arret de la reconfiguration inference a chaque cycle de detection
 - Cache memoire des embeddings avec invalidation
+- Metriques runtime de capture, inference et DB
+- Refactor du `MonitoringPanel` en sous-composants
 - Non exposition des embeddings via API
 - Suppression du rendu HTML brut pour les infos visage
 - Harmonisation du client API frontend
@@ -214,7 +224,7 @@ Ce qui est effectivement termine a ce stade:
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Ajouter des metriques de performance
-2. Refactor `MonitoringPanel` puis `ConfigPanel`
-3. Ajouter rate limiting sur l'API production
-4. Separer `requirements.txt` et `requirements-dev.txt`
+1. Refactor `ConfigPanel`
+2. Ajouter rate limiting sur l'API production
+3. Separer `requirements.txt` et `requirements-dev.txt`
+4. Renommer/assainir `autres_infos_html` cote backend

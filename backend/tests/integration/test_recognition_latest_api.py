@@ -68,6 +68,7 @@ def test_latest_detection_falls_back_to_legacy_columns(monkeypatch, tmp_path):
 
     with TestClient(create_app()) as client:
         login(client)
+        detection_loop.stop()
         with get_connection() as conn:
             conn.execute(
                 "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
@@ -96,6 +97,7 @@ def test_detection_history_returns_latest_10_entries(monkeypatch, tmp_path):
 
     with TestClient(create_app()) as client:
         login(client)
+        detection_loop.stop()
         with get_connection() as conn:
             conn.execute(
                 "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
