@@ -65,15 +65,12 @@ export default function ConfigPanel() {
   const persistConfig = async (state, successMessage) => {
     setStatus("Sauvegarde...");
     const payload = toPayload(state);
-    console.info("[ConfigPanel] PUT /api/config payload", payload);
     try {
       const saved = await saveConfig(payload);
-      console.info("[ConfigPanel] PUT /api/config response", saved);
       setLocal(null);
       setStatus(successMessage);
       return true;
     } catch (err) {
-      console.error("[ConfigPanel] PUT /api/config failed", err);
       setStatus("Echec de sauvegarde.");
       return false;
     }
@@ -97,7 +94,6 @@ export default function ConfigPanel() {
     if (!cleaned) {
       return;
     }
-    console.info("[ConfigPanel] addNetworkSource click", { cleaned });
     const base = config ?? draft;
     const current = base?.network_camera_sources ?? [];
     if (current.includes(cleaned)) {
@@ -118,15 +114,12 @@ export default function ConfigPanel() {
   };
 
   const removeNetworkSource = async (sourceToRemove) => {
-    console.info("[ConfigPanel] removeNetworkSource click", { sourceToRemove });
     const base = config ?? draft;
     const current = base?.network_camera_sources ?? [];
-    console.info("[ConfigPanel] removeNetworkSource current list", current);
     const nextDraft = {
       ...base,
       network_camera_sources: current.filter((source) => source !== sourceToRemove),
     };
-    console.info("[ConfigPanel] removeNetworkSource next list", nextDraft.network_camera_sources);
     setLocal(nextDraft);
     await persistConfig(nextDraft, `Flux reseau supprime: ${sourceToRemove}`);
   };
@@ -143,7 +136,6 @@ export default function ConfigPanel() {
       setStatus("Nom et host requis pour le profil camera.");
       return;
     }
-    console.info("[ConfigPanel] addCameraProfile click", profile);
     const base = config ?? draft;
     const current = base?.network_camera_profiles ?? [];
     if (current.length >= 10) {
@@ -170,7 +162,6 @@ export default function ConfigPanel() {
   };
 
   const removeCameraProfile = async (indexToRemove) => {
-    console.info("[ConfigPanel] removeCameraProfile click", { indexToRemove });
     const base = config ?? draft;
     const current = base?.network_camera_profiles ?? [];
     const nextDraft = {

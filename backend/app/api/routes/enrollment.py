@@ -1,14 +1,19 @@
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.routes.auth import get_current_user
 from app.core.schemas import FaceCreatePayload, FaceEnrollPayload, FaceRecord
 from app.services.camera_service import capture_frame
 from app.services.config_service import read_config
 from app.services.encoder_service import configure_inference_device, extract_averaged_embedding
 from app.services.face_service import create_face
 
-router = APIRouter(prefix="/faces", tags=["enrollment"])
+router = APIRouter(
+    prefix="/faces",
+    tags=["enrollment"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post("/enroll", response_model=FaceRecord)

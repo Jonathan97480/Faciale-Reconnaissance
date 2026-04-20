@@ -33,7 +33,7 @@ def create_face(payload: FaceCreatePayload) -> FaceRecord:
     return FaceRecord(
         id=row["id"],
         name=row["name"],
-        encoding=json.loads(row["encoding_json"]) if row["encoding_json"] else None,
+        has_encoding=bool(row["encoding_json"]),
         adresse=row["adresse"],
         metier=row["metier"],
         lieu_naissance=row["lieu_naissance"],
@@ -54,7 +54,7 @@ def list_faces() -> list[FaceRecord]:
         FaceRecord(
             id=row["id"],
             name=row["name"],
-            encoding=json.loads(row["encoding_json"]) if row["encoding_json"] else None,
+            has_encoding=bool(row["encoding_json"]),
             adresse=row["adresse"],
             metier=row["metier"],
             lieu_naissance=row["lieu_naissance"],

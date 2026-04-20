@@ -151,13 +151,13 @@ export default function FaceManager() {
           <li className="face-row" key={face.id}>
             <div>
               <strong>{face.name}</strong>
-              <div>#{face.id} {face.encoding ? "Encode" : "Sans encodage"}</div>
+              <div>#{face.id} {face.has_encoding ? "Encode" : "Sans encodage"}</div>
               {face.adresse && <div><b>Adresse:</b> {face.adresse}</div>}
               {face.metier && <div><b>Métier:</b> {face.metier}</div>}
               {face.lieu_naissance && <div><b>Lieu naissance:</b> {face.lieu_naissance}</div>}
               {face.age !== undefined && face.age !== null && <div><b>Âge:</b> {face.age}</div>}
               {face.annee_naissance !== undefined && face.annee_naissance !== null && <div><b>Année naissance:</b> {face.annee_naissance}</div>}
-              {face.autres_infos_html && <div><b>Autres infos:</b> <span dangerouslySetInnerHTML={{__html: face.autres_infos_html}} /></div>}
+              {face.autres_infos_html && <div><b>Autres infos:</b> {face.autres_infos_html}</div>}
             </div>
             <button onClick={() => removeFace(face.id)}>Supprimer</button>
           </li>

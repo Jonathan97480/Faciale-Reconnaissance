@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
+from app.api.routes.auth import get_current_user
 from app.services.camera_alert_service import build_camera_alerts
 from app.services.camera_profile_url_service import (
     build_camera_profile_stream_url,
@@ -20,7 +21,11 @@ from app.services.hls_gateway_service import (
 from app.services.network_camera_pool_service import network_camera_pool_status
 from app.services.onvif_discovery_service import discover_onvif_devices
 
-router = APIRouter(prefix="/cameras", tags=["cameras"])
+router = APIRouter(
+    prefix="/cameras",
+    tags=["cameras"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("/onvif/discover")

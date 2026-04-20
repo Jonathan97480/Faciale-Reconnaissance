@@ -1,9 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.routes.auth import get_current_user
 from app.core.schemas import FaceCreatePayload, FaceRecord
 from app.services.face_service import create_face, delete_face, list_faces
 
-router = APIRouter(prefix="/faces", tags=["faces"])
+router = APIRouter(
+    prefix="/faces",
+    tags=["faces"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("", response_model=list[FaceRecord])

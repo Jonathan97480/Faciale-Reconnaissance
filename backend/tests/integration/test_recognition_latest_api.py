@@ -4,12 +4,17 @@ from fastapi.testclient import TestClient
 
 from app.core.database import get_connection
 from app.main import create_app
+from app.services.detection_loop import detection_loop
+from tests.auth_utils import configure_auth_env, login
 
 
 def test_latest_detection_returns_all_detected_faces(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
 
     with TestClient(create_app()) as client:
+        login(client)
+        detection_loop.stop()
         with get_connection() as conn:
             conn.execute(
                 "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
@@ -59,8 +64,10 @@ def test_latest_detection_returns_all_detected_faces(monkeypatch, tmp_path):
 
 def test_latest_detection_falls_back_to_legacy_columns(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
 
     with TestClient(create_app()) as client:
+        login(client)
         with get_connection() as conn:
             conn.execute(
                 "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
@@ -85,8 +92,10 @@ def test_latest_detection_falls_back_to_legacy_columns(monkeypatch, tmp_path):
 
 def test_detection_history_returns_latest_10_entries(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
 
     with TestClient(create_app()) as client:
+        login(client)
         with get_connection() as conn:
             conn.execute(
                 "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",

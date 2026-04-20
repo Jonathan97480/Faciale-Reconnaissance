@@ -1,9 +1,10 @@
 import base64
 import binascii
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 
+from app.api.routes.auth import get_current_user
 from app.core.schemas import (
     ImageBatchAnalyzeRequest,
     ImageBatchItemResponse,
@@ -34,7 +35,11 @@ from app.services.recognition_service import (
     save_detection,
 )
 
-router = APIRouter(prefix="/recognition", tags=["recognition"])
+router = APIRouter(
+    prefix="/recognition",
+    tags=["recognition"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def _is_allowed_image_content_type(content_type: str | None) -> bool:

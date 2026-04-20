@@ -2,10 +2,12 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.services.camera_event_log_service import log_camera_event
+from tests.auth_utils import configure_auth_env, login
 
 
 def test_discover_onvif_endpoint(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
     app = create_app()
 
     monkeypatch.setattr(
@@ -14,6 +16,7 @@ def test_discover_onvif_endpoint(monkeypatch, tmp_path):
     )
 
     with TestClient(app) as client:
+        login(client)
         response = client.get("/api/cameras/onvif/discover?timeout_seconds=1")
         assert response.status_code == 200
         payload = response.json()
@@ -23,9 +26,11 @@ def test_discover_onvif_endpoint(monkeypatch, tmp_path):
 
 def test_camera_events_endpoint(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
     app = create_app()
 
     with TestClient(app) as client:
+        login(client)
         log_camera_event("rtsp://cam1", "error", "read failed")
         response = client.get("/api/cameras/events?limit=10")
         assert response.status_code == 200
@@ -36,9 +41,11 @@ def test_camera_events_endpoint(monkeypatch, tmp_path):
 
 def test_camera_profiles_resolved_endpoint(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
     app = create_app()
 
     with TestClient(app) as client:
+        login(client)
         payload = {
             "detection_interval_seconds": 3,
             "match_threshold": 0.6,
@@ -61,6 +68,7 @@ def test_camera_profiles_resolved_endpoint(monkeypatch, tmp_path):
             "multi_camera_cycle_budget_seconds": 2,
             "enroll_frames_count": 5,
             "face_crop_padding_ratio": 0.2,
+            "inference_device_preference": "auto",
         }
         client.put("/api/config", json=payload)
         response = client.get("/api/cameras/profiles/resolved")
@@ -73,6 +81,7 @@ def test_camera_profiles_resolved_endpoint(monkeypatch, tmp_path):
 
 def test_camera_alerts_endpoint(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
     app = create_app()
     monkeypatch.setattr(
         "app.api.routes.cameras.network_camera_pool_status",
@@ -90,6 +99,7 @@ def test_camera_alerts_endpoint(monkeypatch, tmp_path):
     )
 
     with TestClient(app) as client:
+        login(client)
         response = client.get("/api/cameras/alerts")
         assert response.status_code == 200
         payload = response.json()
@@ -99,9 +109,11 @@ def test_camera_alerts_endpoint(monkeypatch, tmp_path):
 
 def test_playback_start_direct_and_proxy(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
     app = create_app()
 
     with TestClient(app) as client:
+        login(client)
         config_payload = {
             "detection_interval_seconds": 3,
             "match_threshold": 0.6,
@@ -135,6 +147,7 @@ def test_playback_start_direct_and_proxy(monkeypatch, tmp_path):
             "multi_camera_cycle_budget_seconds": 2,
             "enroll_frames_count": 5,
             "face_crop_padding_ratio": 0.2,
+            "inference_device_preference": "auto",
         }
         client.put("/api/config", json=config_payload)
 

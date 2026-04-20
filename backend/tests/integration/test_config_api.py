@@ -2,13 +2,16 @@ from fastapi.testclient import TestClient
 
 from app.core.database import get_connection
 from app.main import create_app
+from tests.auth_utils import configure_auth_env, login
 
 
 def test_get_and_update_config(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
     app = create_app()
 
     with TestClient(app) as client:
+        login(client)
         initial = client.get("/api/config")
         assert initial.status_code == 200
         assert initial.json()["detection_interval_seconds"] == 3

@@ -44,7 +44,7 @@ class FaceCreatePayload(BaseModel):
 class FaceRecord(BaseModel):
     id: int
     name: str
-    encoding: list[float] | None = None
+    has_encoding: bool
     adresse: str | None = None
     metier: str | None = None
     lieu_naissance: str | None = None

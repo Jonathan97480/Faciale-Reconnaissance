@@ -1,10 +1,12 @@
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from tests.auth_utils import configure_auth_env, login
 
 
 def test_analyze_image_returns_multi_face_json(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
 
     monkeypatch.setattr(
         "app.api.routes.recognition.analyze_image_bytes",
@@ -34,6 +36,7 @@ def test_analyze_image_returns_multi_face_json(monkeypatch, tmp_path):
     )
 
     with TestClient(create_app()) as client:
+        login(client)
         response = client.post(
             "/api/recognition/analyze-image",
             content=b"fake-image-bytes",
@@ -49,8 +52,10 @@ def test_analyze_image_returns_multi_face_json(monkeypatch, tmp_path):
 
 def test_analyze_image_rejects_invalid_content_type(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
 
     with TestClient(create_app()) as client:
+        login(client)
         response = client.post(
             "/api/recognition/analyze-image",
             content=b"not-an-image",
@@ -62,6 +67,7 @@ def test_analyze_image_rejects_invalid_content_type(monkeypatch, tmp_path):
 
 def test_analyze_image_returns_400_when_image_invalid(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
 
     def fail(_: bytes):
         raise ValueError("Image invalide")
@@ -69,6 +75,7 @@ def test_analyze_image_returns_400_when_image_invalid(monkeypatch, tmp_path):
     monkeypatch.setattr("app.api.routes.recognition.analyze_image_bytes", fail)
 
     with TestClient(create_app()) as client:
+        login(client)
         response = client.post(
             "/api/recognition/analyze-image",
             content=b"bad-image",
@@ -81,6 +88,7 @@ def test_analyze_image_returns_400_when_image_invalid(monkeypatch, tmp_path):
 
 def test_analyze_images_batch_handles_success_and_errors(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
 
     def fake_analyze(image_bytes: bytes):
         if image_bytes == b"bad":
@@ -103,6 +111,7 @@ def test_analyze_images_batch_handles_success_and_errors(monkeypatch, tmp_path):
     monkeypatch.setattr("app.api.routes.recognition.analyze_image_bytes", fake_analyze)
 
     with TestClient(create_app()) as client:
+        login(client)
         response = client.post(
             "/api/recognition/analyze-images",
             json={
@@ -138,8 +147,10 @@ def test_analyze_images_batch_handles_success_and_errors(monkeypatch, tmp_path):
 
 def test_analyze_images_batch_rejects_empty_request(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
 
     with TestClient(create_app()) as client:
+        login(client)
         response = client.post("/api/recognition/analyze-images", json={"items": []})
 
     assert response.status_code == 422
@@ -147,8 +158,10 @@ def test_analyze_images_batch_rejects_empty_request(monkeypatch, tmp_path):
 
 def test_analyze_images_batch_rejects_invalid_base64(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
 
     with TestClient(create_app()) as client:
+        login(client)
         response = client.post(
             "/api/recognition/analyze-images",
             json={

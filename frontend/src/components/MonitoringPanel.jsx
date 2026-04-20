@@ -87,24 +87,18 @@ export default function MonitoringPanel() {
 
   const removeNetworkFeed = async (sourceToRemove) => {
     setStatus("Suppression du flux reseau...");
-    console.info("[MonitoringPanel] removeNetworkFeed click", { sourceToRemove });
     try {
       const freshConfig = await apiClient.getConfig();
-      console.info("[MonitoringPanel] GET /api/config fresh", freshConfig);
       const next = {
         ...freshConfig,
         network_camera_sources: (freshConfig.network_camera_sources ?? []).filter(
           (source) => source !== sourceToRemove
         ),
       };
-      console.info("[MonitoringPanel] PUT /api/config payload", next);
       await apiClient.updateConfig(buildConfigPayload(next));
-      const after = await apiClient.getConfig();
-      console.info("[MonitoringPanel] GET /api/config after delete", after);
       await refreshLoopState();
       setStatus(`Flux reseau supprime: ${sourceToRemove}`);
     } catch (err) {
-      console.error("[MonitoringPanel] removeNetworkFeed failed", err);
       setStatus("Echec suppression flux reseau.");
     }
   };
