@@ -122,8 +122,50 @@ export default function MonitoringPanel() {
 
   useEffect(() => {
     refreshAll();
-    const timer = setInterval(refreshAll, 3000);
-    return () => clearInterval(timer);
+    let reconnectTimer = null;
+    let socket = null;
+    let closedByCleanup = false;
+
+    const connect = () => {
+      socket = new WebSocket(apiClient.getRecognitionLiveWebSocketUrl());
+      socket.onopen = () => setStatus("Monitoring live connecte.");
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          setLoopState({
+            loop: payload.loop ?? null,
+            capture_settings: payload.capture_settings ?? null,
+            network_cameras: payload.network_cameras ?? null,
+          });
+          setLatestDetection(payload.latest_detection ?? null);
+          setHistory(payload.history ?? []);
+          setCameraAlerts(payload.camera_alerts ?? []);
+        } catch {
+          setStatus("Flux live monitoring invalide.");
+        }
+      };
+      socket.onerror = () => {
+        setStatus("Flux live monitoring indisponible.");
+      };
+      socket.onclose = () => {
+        if (closedByCleanup) {
+          return;
+        }
+        setStatus("Flux live monitoring ferme. Reconnexion...");
+        reconnectTimer = window.setTimeout(connect, 2000);
+      };
+    };
+
+    connect();
+    return () => {
+      closedByCleanup = true;
+      if (reconnectTimer) {
+        window.clearTimeout(reconnectTimer);
+      }
+      if (socket) {
+        socket.close();
+      }
+    };
   }, []);
 
   useEffect(() => {

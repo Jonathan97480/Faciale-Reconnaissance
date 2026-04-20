@@ -1,10 +1,12 @@
 import base64
 import binascii
+import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket
 from fastapi.responses import StreamingResponse
+from starlette.websockets import WebSocketDisconnect
 
-from app.api.routes.auth import get_current_user
+from app.api.routes.auth import get_current_user, get_websocket_user
 from app.core.schemas import (
     ImageBatchAnalyzeRequest,
     ImageBatchItemResponse,
@@ -18,6 +20,8 @@ from app.services.camera_service import (
     current_capture_settings,
     stream_preview_frames,
 )
+from app.services.camera_alert_service import build_camera_alerts
+from app.services.config_service import read_config
 from app.services.detection_loop import detection_loop
 from app.services.image_recognition_service import analyze_image_bytes
 from app.services.network_camera_pool_service import (
@@ -57,6 +61,24 @@ def check_face(payload: RecognitionCheckPayload) -> RecognitionResult:
     return result
 
 
+def _build_monitoring_snapshot() -> dict[str, object]:
+    network_cameras = network_camera_pool_status()
+    source_stats = network_cameras.get("sources", [])
+    alerts = build_camera_alerts(
+        source_stats=source_stats if isinstance(source_stats, list) else [],
+        max_read_latency_ms=350.0,
+        max_detection_staleness_seconds=8.0,
+    )
+    return {
+        "loop": detection_loop.status(),
+        "capture_settings": current_capture_settings(),
+        "network_cameras": network_cameras,
+        "latest_detection": get_latest_detection(),
+        "history": get_detection_history(10),
+        "camera_alerts": alerts,
+    }
+
+
 @router.get("/loop/status")
 def get_loop_status() -> dict[str, object]:
     return {
@@ -64,6 +86,24 @@ def get_loop_status() -> dict[str, object]:
         "capture_settings": current_capture_settings(),
         "network_cameras": network_camera_pool_status(),
     }
+
+
+@router.websocket("/live")
+async def recognition_live(websocket: WebSocket) -> None:
+    try:
+        get_websocket_user(websocket)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+    try:
+        while True:
+            await websocket.send_json(_build_monitoring_snapshot())
+            config = read_config(mask_secrets=True)
+            await asyncio.sleep(config.detection_interval_seconds)
+    except WebSocketDisconnect:
+        return
 
 
 @router.get("/latest")

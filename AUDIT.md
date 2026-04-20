@@ -106,7 +106,7 @@ Fichiers:
 - `backend/tests/integration/test_cameras_api.py`
 
 Verification:
-- `pytest` backend: `59 passed`
+- `pytest` backend: `64 passed`
 
 ### Priorite 2 - Important
 
@@ -200,9 +200,15 @@ Realise:
 - Invalidation explicite sur `update_config()`
 - Refresh automatique si la base SQLite change directement
 
-19. `[a faire]` Remplacer polling frontend par WebSocket
+19. `[fait]` Remplacer polling frontend par WebSocket
 Fichier:
 - `frontend/src/components/MonitoringPanel.jsx`
+
+Realise:
+- Ajout d'un flux WebSocket backend pour le snapshot de monitoring
+- Connexion frontend live avec reconnexion automatique
+- Suppression du polling periodique principal cote UI
+- Proxy Vite aligne pour supporter les upgrades WebSocket en dev
 
 20. `[a faire]` Ajouter ESLint et format frontend
 Fichier:
@@ -241,6 +247,17 @@ Realise:
 - Documentation de l'API production `x-api-key`
 - Ajout des recommandations de deploiement, CORS et rate limiting
 
+26. `[fait]` Retirer l'usage legacy restant de la table `faces`
+Fichiers:
+- `backend/app/core/database.py`
+- `backend/tests/unit/test_database_migration.py`
+
+Realise:
+- Migration automatique des anciennes bases contenant `faces`
+- Migration du schema legacy `detections` qui referencait encore `faces`
+- Suppression de la table `faces` apres transfert
+- Les nouvelles bases ne recreent plus la table legacy
+
 ## Lot Realise
 
 Ce qui est effectivement termine a ce stade:
@@ -263,12 +280,14 @@ Ce qui est effectivement termine a ce stade:
 - Suppression du rendu HTML brut pour les infos visage
 - Harmonisation du client API frontend
 - Tests avances de reconnaissance et de persistance detection
+- Suppression finale de la dependance legacy a la table `faces`
+- Monitoring frontend branche sur un flux WebSocket live
 - Batterie de tests backend mise a jour et verifiee
 
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Eventuelle migration finale pour retirer l'usage legacy de la table `faces`
-2. Remplacer le polling frontend par WebSocket
-3. Ajouter ESLint et format frontend
-4. Ameliorer calibration seuil reconnaissance
+1. Ajouter ESLint et format frontend
+2. Ameliorer calibration seuil reconnaissance
+3. Uniformiser monitoring camera locale vs reseau
+4. Ajouter backoff camera reseau

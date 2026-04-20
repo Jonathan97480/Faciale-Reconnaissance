@@ -34,26 +34,21 @@ def get_connection() -> sqlite3.Connection:
     return connection
 
 
-def _create_legacy_faces_table(connection: sqlite3.Connection) -> None:
-    connection.execute(
+def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
+    row = connection.execute(
         """
-        CREATE TABLE IF NOT EXISTS faces (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            encoding_json TEXT,
-            adresse TEXT,
-            metier TEXT,
-            lieu_naissance TEXT,
-            age INTEGER,
-            annee_naissance INTEGER,
-            autres_infos_html TEXT,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table' AND name = ?
+        """,
+        (table_name,),
+    ).fetchone()
+    return row is not None
 
 
 def _migrate_legacy_faces_columns(connection: sqlite3.Connection) -> None:
+    if not _table_exists(connection, "faces"):
+        return
     face_columns = {
         row["name"] for row in connection.execute("PRAGMA table_info(faces)").fetchall()
     }
@@ -95,10 +90,58 @@ def _create_split_face_tables(connection: sqlite3.Connection) -> None:
             FOREIGN KEY(face_id) REFERENCES face_profiles(id) ON DELETE CASCADE
         )
         """
+        )
+
+
+def _create_detections_table(connection: sqlite3.Connection, table_name: str) -> None:
+    connection.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            status TEXT NOT NULL,
+            face_id INTEGER,
+            score REAL,
+            faces_json TEXT,
+            camera_id INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
     )
 
 
+def _migrate_detections_table_if_needed(connection: sqlite3.Connection) -> None:
+    if not _table_exists(connection, "detections"):
+        return
+
+    foreign_keys = connection.execute("PRAGMA foreign_key_list(detections)").fetchall()
+    references_legacy_faces = any(row["table"] == "faces" for row in foreign_keys)
+    detection_columns = {
+        row["name"] for row in connection.execute("PRAGMA table_info(detections)").fetchall()
+    }
+    if not references_legacy_faces and "faces_json" in detection_columns:
+        return
+
+    _create_detections_table(connection, "detections_migrated")
+    faces_json_expr = "faces_json" if "faces_json" in detection_columns else "NULL"
+    camera_id_expr = "camera_id" if "camera_id" in detection_columns else "0"
+    connection.execute(
+        f"""
+        INSERT INTO detections_migrated (
+            id, status, face_id, score, faces_json, camera_id, created_at
+        )
+        SELECT
+            id, status, face_id, score, {faces_json_expr}, {camera_id_expr}, created_at
+        FROM detections
+        ORDER BY id ASC
+        """
+    )
+    connection.execute("DROP TABLE detections")
+    connection.execute("ALTER TABLE detections_migrated RENAME TO detections")
+
+
 def _migrate_legacy_faces_to_split_tables(connection: sqlite3.Connection) -> None:
+    if not _table_exists(connection, "faces"):
+        return
     legacy_rows = connection.execute(
         """
         SELECT id, name, encoding_json, adresse, metier, lieu_naissance, age,
@@ -107,48 +150,48 @@ def _migrate_legacy_faces_to_split_tables(connection: sqlite3.Connection) -> Non
         ORDER BY id ASC
         """
     ).fetchall()
-    if not legacy_rows:
-        return
+    if legacy_rows:
+        existing_profile_ids = {
+            row["id"] for row in connection.execute("SELECT id FROM face_profiles").fetchall()
+        }
+        existing_embedding_ids = {
+            row["face_id"]
+            for row in connection.execute("SELECT face_id FROM face_embeddings").fetchall()
+        }
 
-    existing_profile_ids = {
-        row["id"] for row in connection.execute("SELECT id FROM face_profiles").fetchall()
-    }
-    existing_embedding_ids = {
-        row["face_id"]
-        for row in connection.execute("SELECT face_id FROM face_embeddings").fetchall()
-    }
-
-    for row in legacy_rows:
-        if row["id"] not in existing_profile_ids:
-            connection.execute(
-                """
-                INSERT INTO face_profiles (
-                    id, name, adresse, metier, lieu_naissance, age,
-                    annee_naissance, autres_infos_text, created_at
+        for row in legacy_rows:
+            if row["id"] not in existing_profile_ids:
+                connection.execute(
+                    """
+                    INSERT INTO face_profiles (
+                        id, name, adresse, metier, lieu_naissance, age,
+                        annee_naissance, autres_infos_text, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        row["id"],
+                        row["name"],
+                        row["adresse"],
+                        row["metier"],
+                        row["lieu_naissance"],
+                        row["age"],
+                        row["annee_naissance"],
+                        row["autres_infos_html"],
+                        row["created_at"],
+                    ),
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    row["id"],
-                    row["name"],
-                    row["adresse"],
-                    row["metier"],
-                    row["lieu_naissance"],
-                    row["age"],
-                    row["annee_naissance"],
-                    row["autres_infos_html"],
-                    row["created_at"],
-                ),
-            )
 
-        if row["encoding_json"] and row["id"] not in existing_embedding_ids:
-            connection.execute(
-                """
-                INSERT INTO face_embeddings (face_id, encoding_json, created_at)
-                VALUES (?, ?, ?)
-                """,
-                (row["id"], row["encoding_json"], row["created_at"]),
-            )
+            if row["encoding_json"] and row["id"] not in existing_embedding_ids:
+                connection.execute(
+                    """
+                    INSERT INTO face_embeddings (face_id, encoding_json, created_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    (row["id"], row["encoding_json"], row["created_at"]),
+                )
+
+    connection.execute("DROP TABLE faces")
 
 
 def init_db() -> None:
@@ -161,22 +204,11 @@ def init_db() -> None:
             )
             """
         )
-        _create_legacy_faces_table(connection)
         _migrate_legacy_faces_columns(connection)
         _create_split_face_tables(connection)
+        _migrate_detections_table_if_needed(connection)
         _migrate_legacy_faces_to_split_tables(connection)
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS detections (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                status TEXT NOT NULL,
-                face_id INTEGER,
-                score REAL,
-                faces_json TEXT,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
+        _create_detections_table(connection, "detections")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS api_batch_logs (
@@ -202,13 +234,6 @@ def init_db() -> None:
             )
             """
         )
-        detection_columns = {
-            row["name"]
-            for row in connection.execute("PRAGMA table_info(detections)").fetchall()
-        }
-        if "faces_json" not in detection_columns:
-            connection.execute("ALTER TABLE detections ADD COLUMN faces_json TEXT")
-
         config_keys = {row[0] for row in connection.execute("SELECT key FROM config").fetchall()}
         for key, value in DEFAULT_CONFIG.items():
             if key not in config_keys:

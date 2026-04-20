@@ -75,3 +75,39 @@ def test_loop_status_includes_performance_metrics(monkeypatch, tmp_path):
             "updated_at",
         }
     )
+
+
+def test_live_websocket_returns_monitoring_snapshot(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
+    configure_auth_env(monkeypatch)
+    monkeypatch.setattr(
+        "app.api.routes.recognition.current_capture_settings",
+        lambda: {"camera_index": 0},
+    )
+    monkeypatch.setattr(
+        "app.api.routes.recognition.network_camera_pool_status",
+        lambda: {"sources": [{"source": "rtsp://cam"}]},
+    )
+    monkeypatch.setattr(
+        "app.api.routes.recognition.build_camera_alerts",
+        lambda **_: [{"source": "rtsp://cam", "level": "warn", "type": "latency"}],
+    )
+    monkeypatch.setattr(
+        "app.api.routes.recognition.get_latest_detection",
+        lambda: {"id": 9, "status": "inconnu", "faces": [], "faces_count": 0},
+    )
+    monkeypatch.setattr(
+        "app.api.routes.recognition.get_detection_history",
+        lambda limit: [{"id": 8, "faces_count": 1, "faces": []}] if limit == 10 else [],
+    )
+
+    with TestClient(create_app()) as client:
+        login(client)
+        with client.websocket_connect("/api/recognition/live") as websocket:
+            payload = websocket.receive_json()
+
+    assert payload["capture_settings"]["camera_index"] == 0
+    assert payload["network_cameras"]["sources"][0]["source"] == "rtsp://cam"
+    assert payload["camera_alerts"][0]["type"] == "latency"
+    assert payload["latest_detection"]["id"] == 9
+    assert payload["history"][0]["id"] == 8

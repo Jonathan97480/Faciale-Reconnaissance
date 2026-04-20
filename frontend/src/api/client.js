@@ -1,5 +1,14 @@
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 
+function buildWebSocketUrl(path) {
+  const apiUrl = new URL(apiBaseUrl, window.location.origin);
+  apiUrl.protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+  apiUrl.pathname = `${apiUrl.pathname.replace(/\/$/, "")}${path}`;
+  apiUrl.search = "";
+  apiUrl.hash = "";
+  return apiUrl.toString();
+}
+
 class ApiError extends Error {
   constructor(status, detail) {
     super(`API error: ${status}${detail ? ` - ${detail}` : ""}`);
@@ -138,6 +147,7 @@ export const apiClient = {
   getRecognitionPreviewStreamUrl: () => `${apiBaseUrl}/recognition/preview/stream`,
   getNetworkPreviewStreamUrl: (source) =>
     `${apiBaseUrl}/recognition/network-preview/stream?source=${encodeURIComponent(source)}`,
+  getRecognitionLiveWebSocketUrl: () => buildWebSocketUrl("/recognition/live"),
   getRecognitionPreviewUrl: (cacheBuster = "") =>
     `${apiBaseUrl}/recognition/preview${cacheBuster ? `?t=${cacheBuster}` : ""}`,
 };

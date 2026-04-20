@@ -4,7 +4,7 @@ import secrets
 from typing import Annotated, Any
 
 import jwt
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Response, WebSocket, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
@@ -80,6 +80,28 @@ def _create_access_token(username: str) -> str:
     return jwt.encode(payload, str(settings["secret_key"]), algorithm="HS256")
 
 
+def authenticate_token(token: str | None) -> AuthenticatedUser:
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentification requise")
+
+    settings = _get_auth_settings()
+    try:
+        payload = jwt.decode(
+            token,
+            str(settings["secret_key"]),
+            algorithms=["HS256"],
+        )
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(status_code=401, detail="Token expire") from exc
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="Token invalide") from exc
+
+    username = payload.get("sub")
+    if username != settings["admin_username"]:
+        raise HTTPException(status_code=401, detail="Utilisateur inconnu")
+    return AuthenticatedUser(username=str(username))
+
+
 @router.post("/login", response_model=Token)
 def login(
     response: Response,
@@ -114,25 +136,11 @@ def get_current_user(
     access_token: Annotated[str | None, Cookie(alias=ACCESS_TOKEN_COOKIE_NAME)] = None,
 ) -> AuthenticatedUser:
     token = _extract_bearer_token(authorization) or access_token
-    if not token:
-        raise HTTPException(status_code=401, detail="Authentification requise")
+    return authenticate_token(token)
 
-    settings = _get_auth_settings()
-    try:
-        payload = jwt.decode(
-            token,
-            str(settings["secret_key"]),
-            algorithms=["HS256"],
-        )
-    except jwt.ExpiredSignatureError as exc:
-        raise HTTPException(status_code=401, detail="Token expire") from exc
-    except jwt.InvalidTokenError as exc:
-        raise HTTPException(status_code=401, detail="Token invalide") from exc
 
-    username = payload.get("sub")
-    if username != settings["admin_username"]:
-        raise HTTPException(status_code=401, detail="Utilisateur inconnu")
-    return AuthenticatedUser(username=str(username))
+def get_websocket_user(websocket: WebSocket) -> AuthenticatedUser:
+    return authenticate_token(websocket.cookies.get(ACCESS_TOKEN_COOKIE_NAME))
 
 
 @router.get("/me", response_model=AuthenticatedUser)
