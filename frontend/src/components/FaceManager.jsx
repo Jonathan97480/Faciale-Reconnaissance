@@ -10,7 +10,7 @@ export default function FaceManager() {
   const [lieuNaissance, setLieuNaissance] = useState("");
   const [age, setAge] = useState("");
   const [anneeNaissance, setAnneeNaissance] = useState("");
-  const [autresInfosHtml, setAutresInfosHtml] = useState("");
+  const [autresInfos, setAutresInfos] = useState("");
   const [status, setStatus] = useState("");
   const [enrolling, setEnrolling] = useState(false);
 
@@ -30,7 +30,7 @@ export default function FaceManager() {
     setLieuNaissance("");
     setAge("");
     setAnneeNaissance("");
-    setAutresInfosHtml("");
+    setAutresInfos("");
   };
 
   const addFace = async () => {
@@ -47,7 +47,7 @@ export default function FaceManager() {
         lieu_naissance: lieuNaissance || null,
         age: age ? Number(age) : null,
         annee_naissance: anneeNaissance ? Number(anneeNaissance) : null,
-        autres_infos_html: autresInfosHtml || null,
+        autres_infos: autresInfos || null,
       });
       resetFields();
       setStatus("Visage ajouté (sans encodage).");
@@ -72,7 +72,7 @@ export default function FaceManager() {
         lieu_naissance: lieuNaissance || null,
         age: age ? Number(age) : null,
         annee_naissance: anneeNaissance ? Number(anneeNaissance) : null,
-        autres_infos_html: autresInfosHtml || null,
+        autres_infos: autresInfos || null,
       });
       resetFields();
       setStatus("Visage enrole avec succès.");
@@ -135,9 +135,9 @@ export default function FaceManager() {
           onChange={(e) => setAnneeNaissance(e.target.value)}
         />
         <textarea
-          value={autresInfosHtml}
-          placeholder="Autres infos (HTML, optionnel)"
-          onChange={(e) => setAutresInfosHtml(e.target.value)}
+          value={autresInfos}
+          placeholder="Autres infos (texte, optionnel)"
+          onChange={(e) => setAutresInfos(e.target.value)}
         />
         <div className="button-row">
           <button onClick={addFace}>Ajouter (sans encodage)</button>
@@ -157,7 +157,7 @@ export default function FaceManager() {
               {face.lieu_naissance && <div><b>Lieu naissance:</b> {face.lieu_naissance}</div>}
               {face.age !== undefined && face.age !== null && <div><b>Âge:</b> {face.age}</div>}
               {face.annee_naissance !== undefined && face.annee_naissance !== null && <div><b>Année naissance:</b> {face.annee_naissance}</div>}
-              {face.autres_infos_html && <div><b>Autres infos:</b> {face.autres_infos_html}</div>}
+              {face.autres_infos && <div><b>Autres infos:</b> {face.autres_infos}</div>}
             </div>
             <button onClick={() => removeFace(face.id)}>Supprimer</button>
           </li>

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class NetworkCameraProfile(BaseModel):
@@ -40,7 +40,10 @@ class FaceCreatePayload(BaseModel):
     lieu_naissance: str | None = None
     age: int | None = None
     annee_naissance: int | None = None
-    autres_infos_html: str | None = None
+    autres_infos: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("autres_infos", "autres_infos_html"),
+    )
 
 
 class FaceRecord(BaseModel):
@@ -52,7 +55,7 @@ class FaceRecord(BaseModel):
     lieu_naissance: str | None = None
     age: int | None = None
     annee_naissance: int | None = None
-    autres_infos_html: str | None = None
+    autres_infos: str | None = None
     created_at: str
 
 

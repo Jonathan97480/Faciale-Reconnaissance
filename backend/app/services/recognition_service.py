@@ -12,11 +12,6 @@ _face_reference_cache_db_path: str | None = None
 
 
 def _cosine_distance(left: list[float], right: list[float]) -> float:
-    """Cosine distance in [0, 2]. Zero means identical direction.
-
-    Zero-norm vectors are handled gracefully: two zero vectors = perfect match,
-    one zero vector = max distance (different).
-    """
     dot = sum(a * b for a, b in zip(left, right))
     norm_l = math.sqrt(sum(a * a for a in left))
     norm_r = math.sqrt(sum(b * b for b in right))
@@ -37,7 +32,12 @@ def invalidate_face_reference_cache() -> None:
 def _load_face_reference_cache() -> list[dict[str, object]]:
     with get_connection() as connection:
         rows = connection.execute(
-            "SELECT id, name, encoding_json FROM faces WHERE encoding_json IS NOT NULL"
+            """
+            SELECT fp.id, fp.name, fe.encoding_json
+            FROM face_profiles fp
+            JOIN face_embeddings fe ON fe.face_id = fp.id
+            WHERE fe.encoding_json IS NOT NULL
+            """
         ).fetchall()
 
     references: list[dict[str, object]] = []
@@ -62,10 +62,7 @@ def _get_face_reference_cache() -> list[dict[str, object]]:
     global _face_reference_cache, _face_reference_cache_db_path
     current_db_path = str(get_db_path())
     with _cache_lock:
-        if (
-            _face_reference_cache is None
-            or _face_reference_cache_db_path != current_db_path
-        ):
+        if _face_reference_cache is None or _face_reference_cache_db_path != current_db_path:
             _face_reference_cache = _load_face_reference_cache()
             _face_reference_cache_db_path = current_db_path
         return list(_face_reference_cache)
@@ -81,10 +78,8 @@ def recognize_face(embedding: list[float] | None) -> RecognitionResult:
 
     best_match: dict[str, float | int | str] | None = None
     for entry in references:
-        reference = entry["reference"]
-        distance = _cosine_distance(embedding, reference)
+        distance = _cosine_distance(embedding, entry["reference"])
         score = 1 / (1 + distance)
-
         if best_match is None or score > float(best_match["score"]):
             best_match = {
                 "id": int(entry["id"]),
@@ -166,9 +161,9 @@ def get_latest_detection() -> dict[str, object] | None:
     with get_connection() as connection:
         row = connection.execute(
             """
-            SELECT d.id, d.status, d.face_id, f.name AS face_name, d.score, d.faces_json, d.created_at
+            SELECT d.id, d.status, d.face_id, fp.name AS face_name, d.score, d.faces_json, d.created_at
             FROM detections d
-            LEFT JOIN faces f ON f.id = d.face_id
+            LEFT JOIN face_profiles fp ON fp.id = d.face_id
             ORDER BY d.id DESC
             LIMIT 1
             """
@@ -177,7 +172,6 @@ def get_latest_detection() -> dict[str, object] | None:
     if row is None:
         return None
     faces = _parse_detection_faces(row)
-
     return {
         "id": int(row["id"]),
         "status": str(row["status"]),
@@ -195,9 +189,9 @@ def get_detection_history(limit: int = 10) -> list[dict[str, object]]:
     with get_connection() as connection:
         rows = connection.execute(
             """
-            SELECT d.id, d.status, d.face_id, f.name AS face_name, d.score, d.faces_json, d.created_at
+            SELECT d.id, d.status, d.face_id, fp.name AS face_name, d.score, d.faces_json, d.created_at
             FROM detections d
-            LEFT JOIN faces f ON f.id = d.face_id
+            LEFT JOIN face_profiles fp ON fp.id = d.face_id
             ORDER BY d.id DESC
             LIMIT ?
             """,

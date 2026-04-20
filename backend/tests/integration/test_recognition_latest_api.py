@@ -8,6 +8,15 @@ from app.services.detection_loop import detection_loop
 from tests.auth_utils import configure_auth_env, login
 
 
+def _insert_face_with_embedding(connection, name: str, embedding: list[float]) -> int:
+    cursor = connection.execute("INSERT INTO face_profiles (name) VALUES (?)", (name,))
+    connection.execute(
+        "INSERT INTO face_embeddings (face_id, encoding_json) VALUES (?, ?)",
+        (cursor.lastrowid, json.dumps(embedding)),
+    )
+    return cursor.lastrowid
+
+
 def test_latest_detection_returns_all_detected_faces(monkeypatch, tmp_path):
     monkeypatch.setenv("FACE_APP_DB_PATH", str(tmp_path / "test.db"))
     configure_auth_env(monkeypatch)
@@ -16,14 +25,8 @@ def test_latest_detection_returns_all_detected_faces(monkeypatch, tmp_path):
         login(client)
         detection_loop.stop()
         with get_connection() as conn:
-            conn.execute(
-                "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
-                ("Alice", json.dumps([0.1] * 512)),
-            )
-            conn.execute(
-                "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
-                ("Bob", json.dumps([0.2] * 512)),
-            )
+            _insert_face_with_embedding(conn, "Alice", [0.1] * 512)
+            _insert_face_with_embedding(conn, "Bob", [0.2] * 512)
             conn.execute(
                 """
                 INSERT INTO detections (status, face_id, score, faces_json)
@@ -70,10 +73,7 @@ def test_latest_detection_falls_back_to_legacy_columns(monkeypatch, tmp_path):
         login(client)
         detection_loop.stop()
         with get_connection() as conn:
-            conn.execute(
-                "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
-                ("Charlie", json.dumps([0.3] * 512)),
-            )
+            _insert_face_with_embedding(conn, "Charlie", [0.3] * 512)
             conn.execute(
                 """
                 INSERT INTO detections (status, face_id, score, faces_json)
@@ -99,10 +99,7 @@ def test_detection_history_returns_latest_10_entries(monkeypatch, tmp_path):
         login(client)
         detection_loop.stop()
         with get_connection() as conn:
-            conn.execute(
-                "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
-                ("Agent", json.dumps([0.4] * 512)),
-            )
+            _insert_face_with_embedding(conn, "Agent", [0.4] * 512)
             for index in range(12):
                 conn.execute(
                     """

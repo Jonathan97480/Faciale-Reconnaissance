@@ -1,13 +1,21 @@
 import json
 import sqlite3
 
-import pytest
-
 from app.core.database import get_connection, init_db
 from app.services.recognition_service import (
     invalidate_face_reference_cache,
     recognize_face,
 )
+
+
+def _insert_face_with_embedding(name: str, embedding: list[float]) -> None:
+    with get_connection() as conn:
+        cursor = conn.execute("INSERT INTO face_profiles (name) VALUES (?)", (name,))
+        conn.execute(
+            "INSERT INTO face_embeddings (face_id, encoding_json) VALUES (?, ?)",
+            (cursor.lastrowid, json.dumps(embedding)),
+        )
+        conn.commit()
 
 
 def test_returns_inconnu_when_embedding_is_missing(monkeypatch, tmp_path):
@@ -37,12 +45,7 @@ def test_returns_reconnu_when_match_above_threshold(monkeypatch, tmp_path):
     invalidate_face_reference_cache()
 
     reference = [0.0] * 128
-    with get_connection() as conn:
-        conn.execute(
-            "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
-            ("Alice", json.dumps(reference)),
-        )
-        conn.commit()
+    _insert_face_with_embedding("Alice", reference)
 
     result = recognize_face(reference)
 
@@ -60,11 +63,8 @@ def test_returns_inconnu_when_score_below_threshold(monkeypatch, tmp_path):
             "UPDATE config SET value = ? WHERE key = ?",
             ("0.9999", "match_threshold"),
         )
-        conn.execute(
-            "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
-            ("Alice", json.dumps([0.0] * 128)),
-        )
         conn.commit()
+    _insert_face_with_embedding("Alice", [0.0] * 128)
 
     result = recognize_face([0.5] * 128)
 
@@ -77,12 +77,7 @@ def test_face_reference_cache_avoids_repeated_face_queries(monkeypatch, tmp_path
     invalidate_face_reference_cache()
 
     reference = [0.0] * 128
-    with get_connection() as conn:
-        conn.execute(
-            "INSERT INTO faces (name, encoding_json) VALUES (?, ?)",
-            ("Alice", json.dumps(reference)),
-        )
-        conn.commit()
+    _insert_face_with_embedding("Alice", reference)
 
     query_count = {"faces": 0}
     original_get_connection = get_connection
@@ -92,7 +87,7 @@ def test_face_reference_cache_avoids_repeated_face_queries(monkeypatch, tmp_path
             self._connection = connection
 
         def execute(self, sql, params=()):
-            if "SELECT id, name, encoding_json FROM faces" in sql:
+            if "SELECT fp.id, fp.name, fe.encoding_json" in sql:
                 query_count["faces"] += 1
             return self._connection.execute(sql, params)
 
@@ -120,4 +115,3 @@ def test_face_reference_cache_avoids_repeated_face_queries(monkeypatch, tmp_path
     assert first.status == "reconnu"
     assert second.status == "reconnu"
     assert query_count["faces"] == 1
-

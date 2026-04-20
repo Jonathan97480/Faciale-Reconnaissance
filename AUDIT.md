@@ -59,13 +59,14 @@ Objectif:
 5. `[fait]` Supprimer ou securiser `autres_infos_html`
 Fichiers:
 - `frontend/src/components/FaceManager.jsx`
+- `backend/app/core/schemas.py`
+- `backend/app/services/face_service.py`
 
 Realise:
 - Suppression du rendu HTML brut via `dangerouslySetInnerHTML`
 - Affichage en texte brut cote frontend
-
-Reste a faire:
-- Renommer le champ API et la persistence pour enlever l'ambiguite HTML
+- Renommage du champ API en `autres_infos`
+- Compatibilite de lecture de l'ancien input `autres_infos_html`
 
 6. `[fait]` Ne pas exposer les embeddings via API
 Fichiers:
@@ -243,7 +244,7 @@ Ce qui est effectivement termine a ce stade:
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Renommer/assainir `autres_infos_html` cote backend
-2. Separer biometrie et identite en 2 tables
-3. Ajouter cache config
-4. Ameliorer README securite + prod
+1. Separer biometrie et identite en 2 tables
+2. Ajouter cache config
+3. Ameliorer README securite + prod
+4. Ajouter tests avances reconnaissance
