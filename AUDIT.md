@@ -103,13 +103,18 @@ Fichiers:
 - `backend/tests/integration/test_cameras_api.py`
 
 Verification:
-- `pytest` backend: `44 passed`
+- `pytest` backend: `49 passed`
 
 ### Priorite 2 - Important
 
-9. `[a faire]` Optimiser la reconnaissance avec cache memoire
+9. `[fait]` Optimiser la reconnaissance avec cache memoire
 Fichier:
 - `backend/app/services/recognition_service.py`
+
+Realise:
+- Chargement des embeddings en memoire avec cache lie au chemin de base locale
+- Rechargement automatique si la base cible change
+- Invalidation explicite sur creation et suppression de visage
 
 10. `[fait]` Eviter la reconfiguration GPU a chaque boucle
 Fichier:
@@ -200,6 +205,7 @@ Ce qui est effectivement termine a ce stade:
 - Remplacement de la crypto maison par `Fernet` avec compatibilite legacy
 - Decouplage lecture config / runtime inference
 - Arret de la reconfiguration inference a chaque cycle de detection
+- Cache memoire des embeddings avec invalidation
 - Non exposition des embeddings via API
 - Suppression du rendu HTML brut pour les infos visage
 - Harmonisation du client API frontend
@@ -208,7 +214,7 @@ Ce qui est effectivement termine a ce stade:
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Ajouter un cache memoire des embeddings
-2. Ajouter des metriques de performance
-3. Refactor `MonitoringPanel` puis `ConfigPanel`
-4. Ajouter rate limiting sur l'API production
+1. Ajouter des metriques de performance
+2. Refactor `MonitoringPanel` puis `ConfigPanel`
+3. Ajouter rate limiting sur l'API production
+4. Separer `requirements.txt` et `requirements-dev.txt`

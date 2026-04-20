@@ -2,6 +2,7 @@ import json
 
 from app.core.database import get_connection
 from app.core.schemas import FaceCreatePayload, FaceRecord
+from app.services.recognition_service import invalidate_face_reference_cache
 
 
 def create_face(payload: FaceCreatePayload) -> FaceRecord:
@@ -29,6 +30,7 @@ def create_face(payload: FaceCreatePayload) -> FaceRecord:
             (face_id,),
         ).fetchone()
         connection.commit()
+    invalidate_face_reference_cache()
 
     return FaceRecord(
         id=row["id"],
@@ -73,4 +75,6 @@ def delete_face(face_id: int) -> bool:
             "DELETE FROM faces WHERE id = ?", (face_id,)
         )
         connection.commit()
+    if cursor.rowcount > 0:
+        invalidate_face_reference_cache()
     return cursor.rowcount > 0

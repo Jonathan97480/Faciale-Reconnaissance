@@ -1,9 +1,14 @@
 import json
 import math
+import threading
 
-from app.core.database import get_connection
+from app.core.database import get_connection, get_db_path
 from app.core.schemas import RecognitionResult
 from app.services.config_service import read_config
+
+_cache_lock = threading.Lock()
+_face_reference_cache: list[dict[str, object]] | None = None
+_face_reference_cache_db_path: str | None = None
 
 
 def _cosine_distance(left: list[float], right: list[float]) -> float:
@@ -22,19 +27,20 @@ def _cosine_distance(left: list[float], right: list[float]) -> float:
     return 1.0 - dot / (norm_l * norm_r)
 
 
-def recognize_face(embedding: list[float] | None) -> RecognitionResult:
-    if not embedding:
-        return RecognitionResult(status="inconnu")
+def invalidate_face_reference_cache() -> None:
+    global _face_reference_cache, _face_reference_cache_db_path
+    with _cache_lock:
+        _face_reference_cache = None
+        _face_reference_cache_db_path = None
 
-    config = read_config()
-    threshold = config.match_threshold
 
+def _load_face_reference_cache() -> list[dict[str, object]]:
     with get_connection() as connection:
         rows = connection.execute(
             "SELECT id, name, encoding_json FROM faces WHERE encoding_json IS NOT NULL"
         ).fetchall()
 
-    best_match: dict[str, float | int | str] | None = None
+    references: list[dict[str, object]] = []
     for row in rows:
         try:
             reference = json.loads(row["encoding_json"])
@@ -42,14 +48,47 @@ def recognize_face(embedding: list[float] | None) -> RecognitionResult:
             continue
         if not isinstance(reference, list) or not reference:
             continue
+        references.append(
+            {
+                "id": int(row["id"]),
+                "name": str(row["name"]),
+                "reference": reference,
+            }
+        )
+    return references
 
+
+def _get_face_reference_cache() -> list[dict[str, object]]:
+    global _face_reference_cache, _face_reference_cache_db_path
+    current_db_path = str(get_db_path())
+    with _cache_lock:
+        if (
+            _face_reference_cache is None
+            or _face_reference_cache_db_path != current_db_path
+        ):
+            _face_reference_cache = _load_face_reference_cache()
+            _face_reference_cache_db_path = current_db_path
+        return list(_face_reference_cache)
+
+
+def recognize_face(embedding: list[float] | None) -> RecognitionResult:
+    if not embedding:
+        return RecognitionResult(status="inconnu")
+
+    config = read_config()
+    threshold = config.match_threshold
+    references = _get_face_reference_cache()
+
+    best_match: dict[str, float | int | str] | None = None
+    for entry in references:
+        reference = entry["reference"]
         distance = _cosine_distance(embedding, reference)
         score = 1 / (1 + distance)
 
         if best_match is None or score > float(best_match["score"]):
             best_match = {
-                "id": row["id"],
-                "name": row["name"],
+                "id": int(entry["id"]),
+                "name": str(entry["name"]),
                 "score": score,
             }
 
