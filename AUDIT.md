@@ -149,9 +149,14 @@ Realise:
 - Extraction du flux principal, de la grille des flux, de l'historique reutilisable et du panneau d'analyse image
 - Reduction de la taille et de la complexite du composant orchestrateur
 
-14. `[a faire]` Refactor `ConfigPanel`
+14. `[fait]` Refactor `ConfigPanel`
 Fichier:
 - `frontend/src/components/ConfigPanel.jsx`
+
+Realise:
+- Extraction des helpers de payload
+- Separation des blocs UI general, flux reseau et profils camera
+- Reduction de la taille et de la complexite du composant principal
 
 15. `[fait]` Unifier le client API frontend
 Fichier:
@@ -216,6 +221,7 @@ Ce qui est effectivement termine a ce stade:
 - Cache memoire des embeddings avec invalidation
 - Metriques runtime de capture, inference et DB
 - Refactor du `MonitoringPanel` en sous-composants
+- Refactor du `ConfigPanel` en sections et helpers
 - Non exposition des embeddings via API
 - Suppression du rendu HTML brut pour les infos visage
 - Harmonisation du client API frontend
@@ -224,7 +230,7 @@ Ce qui est effectivement termine a ce stade:
 ## Prochain Lot Recommande
 
 Ordre conseille pour la suite:
-1. Refactor `ConfigPanel`
-2. Ajouter rate limiting sur l'API production
-3. Separer `requirements.txt` et `requirements-dev.txt`
-4. Renommer/assainir `autres_infos_html` cote backend
+1. Ajouter rate limiting sur l'API production
+2. Separer `requirements.txt` et `requirements-dev.txt`
+3. Renommer/assainir `autres_infos_html` cote backend
+4. Separer biometrie et identite en 2 tables
